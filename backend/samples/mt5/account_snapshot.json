@@ -1,0 +1,12 @@
+{
+  "account_id": 1,
+  "captured_at": "2026-06-25T01:00:00+07:00",
+  "snapshot": {
+    "balance": 10000,
+    "equity": 10080,
+    "margin": 200,
+    "free_margin": 9880,
+    "margin_level": 5040,
+    "profit": 80
+  }
+}

@@ -1,0 +1,38 @@
+{
+  "source": "sample_cache",
+  "events": [
+    {
+      "source": "sample_cache",
+      "external_event_id": "sample-us-cpi-2026-06-25",
+      "event_time": "2026-06-25T12:30:00+00:00",
+      "currency": "USD",
+      "impact": "high",
+      "title": "US CPI m/m",
+      "actual": null,
+      "forecast": "0.2%",
+      "previous": "0.3%"
+    },
+    {
+      "source": "sample_cache",
+      "external_event_id": "sample-eu-rate-2026-06-25",
+      "event_time": "2026-06-25T11:45:00+00:00",
+      "currency": "EUR",
+      "impact": "medium",
+      "title": "ECB Main Refinancing Rate",
+      "actual": null,
+      "forecast": "3.75%",
+      "previous": "3.75%"
+    },
+    {
+      "source": "sample_cache",
+      "external_event_id": "sample-jp-holiday-2026-06-26",
+      "event_time": "2026-06-26T00:00:00+00:00",
+      "currency": "JPY",
+      "impact": "holiday",
+      "title": "Bank Holiday",
+      "actual": null,
+      "forecast": null,
+      "previous": null
+    }
+  ]
+}

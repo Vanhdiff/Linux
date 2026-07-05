@@ -1,0 +1,15 @@
+{
+  "account_id": 1,
+  "symbol": "XAUUSD",
+  "timeframe": "M15",
+  "candles": [
+    {
+      "time": "2026-06-25T01:00:00+07:00",
+      "open": 2320,
+      "high": 2332,
+      "low": 2318,
+      "close": 2330,
+      "tick_volume": 1200
+    }
+  ]
+}

@@ -1,0 +1,18 @@
+{
+  "account_id": 1,
+  "orders": [
+    {
+      "ticket": "sample-order-1",
+      "symbol": "XAUUSD",
+      "type": "buy",
+      "volume_initial": 0.1,
+      "volume_current": 0,
+      "price_open": 2320,
+      "sl": 2310,
+      "tp": 2340,
+      "time": "2026-06-25T00:40:00+07:00",
+      "state": "filled",
+      "comment": "sample order"
+    }
+  ]
+}

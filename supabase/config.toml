@@ -1,0 +1,7 @@
+project_id = "kcylkaiawiftlkkkltly"
+
+[functions.activate-license]
+verify_jwt = true
+
+[functions.validate-license]
+verify_jwt = true

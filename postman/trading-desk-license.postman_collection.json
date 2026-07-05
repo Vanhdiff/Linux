@@ -1,0 +1,171 @@
+{
+  "info": {
+    "_postman_id": "c4fc4170-2c6d-4f5c-9cd6-01f1e750f2cb",
+    "name": "Trading Desk License",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "item": [
+    {
+      "name": "Login User",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          },
+          {
+            "key": "apikey",
+            "value": "{{supabase_anon_key}}"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"email\": \"{{user_email}}\",\n  \"password\": \"{{user_password}}\"\n}"
+        },
+        "url": {
+          "raw": "{{supabase_url}}/auth/v1/token?grant_type=password",
+          "host": [
+            "{{supabase_url}}"
+          ],
+          "path": [
+            "auth",
+            "v1",
+            "token"
+          ],
+          "query": [
+            {
+              "key": "grant_type",
+              "value": "password"
+            }
+          ]
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "const json = pm.response.json();",
+              "if (json.access_token) {",
+              "  pm.collectionVariables.set('user_access_token', json.access_token);",
+              "}",
+              "if (json.refresh_token) {",
+              "  pm.collectionVariables.set('user_refresh_token', json.refresh_token);",
+              "}"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "Activate License",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          },
+          {
+            "key": "apikey",
+            "value": "{{supabase_anon_key}}"
+          },
+          {
+            "key": "Authorization",
+            "value": "Bearer {{user_access_token}}"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"license_key\": \"{{license_key}}\",\n  \"device_id\": \"{{device_id}}\",\n  \"device_name\": \"{{device_name}}\",\n  \"app_version\": \"1.0.0\"\n}"
+        },
+        "url": {
+          "raw": "{{supabase_url}}/functions/v1/activate-license",
+          "host": [
+            "{{supabase_url}}"
+          ],
+          "path": [
+            "functions",
+            "v1",
+            "activate-license"
+          ]
+        }
+      }
+    },
+    {
+      "name": "Validate License",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          },
+          {
+            "key": "apikey",
+            "value": "{{supabase_anon_key}}"
+          },
+          {
+            "key": "Authorization",
+            "value": "Bearer {{user_access_token}}"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"license_key\": \"{{license_key}}\",\n  \"device_id\": \"{{device_id}}\",\n  \"device_name\": \"{{device_name}}\",\n  \"app_version\": \"1.0.0\"\n}"
+        },
+        "url": {
+          "raw": "{{supabase_url}}/functions/v1/validate-license",
+          "host": [
+            "{{supabase_url}}"
+          ],
+          "path": [
+            "functions",
+            "v1",
+            "validate-license"
+          ]
+        }
+      }
+    }
+  ],
+  "variable": [
+    {
+      "key": "supabase_url",
+      "value": "https://kcylkaiawiftlkkkltly.supabase.co"
+    },
+    {
+      "key": "supabase_anon_key",
+      "value": "YOUR_ANON_KEY"
+    },
+    {
+      "key": "user_access_token",
+      "value": "USER_JWT_AFTER_LOGIN"
+    },
+    {
+      "key": "user_refresh_token",
+      "value": "USER_REFRESH_TOKEN_AFTER_LOGIN"
+    },
+    {
+      "key": "user_email",
+      "value": "test@tradingdesk.app"
+    },
+    {
+      "key": "user_password",
+      "value": "YOUR_TEST_PASSWORD"
+    },
+    {
+      "key": "license_key",
+      "value": "TD-PRO-001"
+    },
+    {
+      "key": "device_id",
+      "value": "windows-device-001"
+    },
+    {
+      "key": "device_name",
+      "value": "DESKTOP-TRADER"
+    }
+  ]
+}

@@ -1,0 +1,19 @@
+{
+  "account_id": 1,
+  "deals": [
+    {
+      "ticket": "sample-deal-1",
+      "order": "sample-order-1",
+      "symbol": "XAUUSD",
+      "direction": "buy",
+      "entry": "out",
+      "volume": 0.1,
+      "price": 2330.5,
+      "profit": 120,
+      "commission": -2,
+      "swap": 0,
+      "time": "2026-06-25T01:10:00+07:00",
+      "comment": "sample close"
+    }
+  ]
+}
