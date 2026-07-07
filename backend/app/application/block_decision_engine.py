@@ -140,11 +140,9 @@ class BlockDecisionEngine:
             rule_code = check.get("rule_code", "")
             severity = check.get("severity", "warning")
 
-            # Only include critical severity for blocking
-            if severity != "critical":
-                continue
-
-            # Only include rules that can block
+            # Include rules that can block. Some full-day business rules are
+            # intentionally warning severity for UI display, but still become
+            # blocking when GuardrailService has selected them as block reasons.
             if rule_code in FULL_DAY_BLOCK_CODES or rule_code in TEMPORARY_BLOCK_CODES:
                 reasons.append({
                     "rule_code": rule_code,

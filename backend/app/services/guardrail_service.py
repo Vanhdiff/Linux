@@ -16,19 +16,15 @@ from app.models import (
 )
 from app.schemas.guardrail import GuardrailSettingsPatch
 from app.services.block_state_service import BlockStateService
-
-# Phase 1B: New engines for separated concerns
-from app.domain.services.rule_engine import RuleEngine, RuleEvaluationInput
-from app.application.block_decision_engine import BlockDecisionEngine
+from app.application.guardrail_block_pipeline import GuardrailBlockPipeline
+from app.domain.services.rule_engine import RuleEvaluationInput
 
 
 class GuardrailService:
     def __init__(self, db: Session) -> None:
         self._db = db
         self._block_state = BlockStateService(db)
-        # Phase 1B: Initialize new engines
-        self._rule_engine = RuleEngine()
-        self._decision_engine = BlockDecisionEngine(db)
+        self._block_pipeline = GuardrailBlockPipeline(db)
 
     def status(
         self,
@@ -98,36 +94,48 @@ class GuardrailService:
                 ),
             }
 
-        live_checks = [
-            self._daily_loss_check(
-                settings,
-                trades,
-                target_date,
+        live_checks = self._block_pipeline.evaluate_rules(
+            input_data=RuleEvaluationInput(
+                account_id=account_id,
+                target_date=target_date,
+                trades=trades,
+                opened_trades=opened_trades,
+                open_positions=live_positions,
                 floating_pnl=live_floating_pnl,
+                settings=self._block_pipeline.settings_for_rule_engine(settings),
+                account_value=self._daily_start_account_value(account_id, target_date),
             ),
-            self._daily_profit_check(settings, trades, target_date),
-            self._trade_count_check(settings, trade_count, target_date),
-            self._risk_check(settings, opened_trades, target_date),
-            self._news_window_check(settings),
-            self._revenge_pattern_check(opened_trades, target_date),
-            self._consecutive_loss_pause_check(settings, trades, target_date),
-            self._cooling_off_active_check(
-                settings,
-                opened_trades,
-                target_date,
-                open_positions=live_positions,
-            ),
-            self._live_averaging_loss_check(
-                settings,
-                target_date,
-                open_positions=live_positions,
-            ),
-            self._live_martingale_check(
-                settings,
-                target_date,
-                open_positions=live_positions,
-            ),
-        ]
+            compatibility_checks=[
+                self._daily_loss_check(
+                    settings,
+                    trades,
+                    target_date,
+                    floating_pnl=live_floating_pnl,
+                ),
+                self._daily_profit_check(settings, trades, target_date),
+                self._trade_count_check(settings, trade_count, target_date),
+                self._risk_check(settings, opened_trades, target_date),
+                self._news_window_check(settings),
+                self._revenge_pattern_check(opened_trades, target_date),
+                self._consecutive_loss_pause_check(settings, trades, target_date),
+                self._cooling_off_active_check(
+                    settings,
+                    opened_trades,
+                    target_date,
+                    open_positions=live_positions,
+                ),
+                self._live_averaging_loss_check(
+                    settings,
+                    target_date,
+                    open_positions=live_positions,
+                ),
+                self._live_martingale_check(
+                    settings,
+                    target_date,
+                    open_positions=live_positions,
+                ),
+            ],
+        )
         self._sync_rule_breaks(account_id, live_checks)
         open_rule_breaks = self._open_rule_breaks(account_id)
         checks = live_checks + [self._rule_break_count_check(open_rule_breaks)]
@@ -140,24 +148,15 @@ class GuardrailService:
         trade_block_reasons = self._trade_block_reasons(settings, checks)
         trade_blocked = trade_blocking_enabled and bool(trade_block_reasons)
 
-        # ----- Block state persistence -----
-        block_state: dict[str, Any] = {
-            "active": False,
-            "block_type": None,
-            "remaining_seconds": 0,
-        }
-        if trade_blocked and trade_block_reasons:
-            block_obj = self._block_state.apply_block(
-                account_id,
-                trade_block_reasons,
-            )
-            if block_obj is not None:
-                # If a block was applied, update trade_blocked from the persisted
-                # state so the response stays consistent with the database.
-                block_state = self._block_state.block_status(account_id)
-                trade_blocked = block_state["active"]
-            else:
-                block_state["active"] = False
+        # ----- Block state persistence through target architecture -----
+        block_state = self._block_pipeline.apply_block_decision(
+            account_id=account_id,
+            target_date=target_date,
+            trade_block_reasons=trade_block_reasons,
+            trade_blocking_enabled=trade_blocking_enabled,
+        )
+        if trade_blocking_enabled and block_state["active"]:
+            trade_blocked = True
 
         return {
             "account_id": account_id,

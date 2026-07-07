@@ -46,10 +46,9 @@ class BlockFilePayload:
     block_type: str | None  # "temporary" or "full_day"
     blocked_at: str | None
     expires_at: str | None
-    remaining_seconds: int
+    updated_at: str = field(default_factory=lambda: datetime.now(timezone.utc).isoformat())
     triggered_by: list[str] = field(default_factory=list)
     reasons: list[dict] = field(default_factory=list)
-    updated_at: str
 
 
 class EACommunicationLayer:
