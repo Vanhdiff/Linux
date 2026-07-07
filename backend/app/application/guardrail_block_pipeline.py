@@ -76,16 +76,24 @@ class GuardrailBlockPipeline:
                 "remaining_seconds": 0,
             }
 
+        blocking_checks = [
+            {
+                **reason,
+                "triggered": True,
+            }
+            for reason in trade_block_reasons
+        ]
+
         result = RuleEvaluationResult(
             account_id=account_id,
             target_date=target_date,
-            checks=trade_block_reasons,
-            triggered_count=len(trade_block_reasons),
+            checks=blocking_checks,
+            triggered_count=len(blocking_checks),
             critical_count=len(
-                [item for item in trade_block_reasons if item.get("severity") == "critical"]
+                [item for item in blocking_checks if item.get("severity") == "critical"]
             ),
             warning_count=len(
-                [item for item in trade_block_reasons if item.get("severity") == "warning"]
+                [item for item in blocking_checks if item.get("severity") == "warning"]
             ),
         )
         decision = self._decision_engine.decide(

@@ -313,13 +313,15 @@ class BlockRepository:
         )
 
     def _coerce_block_type(self, value: object) -> BlockType:
-        text = str(value or "").strip().lower()
+        raw_value = value.value if hasattr(value, "value") else value
+        text = str(raw_value or "").strip().lower()
         if text in {"full_day", "full-day", "full day"}:
             return BlockType.FULL_DAY
         return BlockType.TEMPORARY
 
     def _coerce_block_type_value(self, value: object) -> str:
-        text = str(value or "").strip().lower()
+        raw_value = value.value if hasattr(value, "value") else value
+        text = str(raw_value or "").strip().lower()
         if text in {"full_day", "full-day", "full day"}:
             return "full_day"
         return "temporary"

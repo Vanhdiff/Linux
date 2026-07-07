@@ -16,7 +16,12 @@ from app.models import (
 )
 from app.schemas.guardrail import GuardrailSettingsPatch
 from app.services.block_state_service import BlockStateService
+from app.application.discipline_score_service import DisciplineScoreService
+from app.application.guardrail_data_collector import GuardrailDataCollector
 from app.application.guardrail_block_pipeline import GuardrailBlockPipeline
+from app.application.guardrail_response_builder import GuardrailResponseBuilder
+from app.application.rule_break_sync_service import RuleBreakSyncService
+from app.application.settings_lock_service import SettingsLockService
 from app.domain.services.rule_engine import RuleEvaluationInput
 
 
@@ -24,7 +29,33 @@ class GuardrailService:
     def __init__(self, db: Session) -> None:
         self._db = db
         self._block_state = BlockStateService(db)
+        self._data_collector = GuardrailDataCollector(
+            db,
+            trade_entry_signature=self._trade_entry_signature,
+            deal_direction=self._deal_direction,
+            is_open_deal=self._is_open_deal,
+            position_opened_at=self._position_opened_at,
+            position_volume=self._position_volume,
+            position_profit=self._position_profit,
+        )
         self._block_pipeline = GuardrailBlockPipeline(db)
+        self._settings_lock = SettingsLockService(db, self._today)
+        self._rule_break_sync = RuleBreakSyncService(
+            db,
+            open_rule_breaks=self._open_rule_breaks,
+        )
+        self._score_service = DisciplineScoreService(
+            setting_enabled=self._setting_enabled,
+            performance_score_rows=self._performance_score_rows,
+            discipline_score_rows=self._discipline_score_rows,
+            consistency_score_rows=self._consistency_score_rows,
+        )
+        self._response_builder = GuardrailResponseBuilder(
+            trade_block_payload=self._trade_block_payload,
+            guardrail_lock_payload=self._guardrail_lock_payload,
+            settings_payload=self._settings_payload,
+            scorecard_payload=self._scorecard,
+        )
 
     def status(
         self,
@@ -55,44 +86,16 @@ class GuardrailService:
         )
 
         if not settings.enabled:
-            return {
-                "account_id": account_id,
-                "mode": "local_read_only",
-                "trade_blocking_enabled": False,
-                "trade_blocked": False,
-                "trade_block": self._trade_block_payload(False, []),
-                "block_state": {
-                    "active": False,
-                    "block_type": None,
-                    "remaining_seconds": 0,
-                },
-                "enabled": False,
-                "date": target_date.isoformat(),
-                "status": "disabled",
-                "summary": {
-                    "triggered_count": 0,
-                    "critical_count": 0,
-                    "warning_count": 0,
-                },
-                "guardrail_lock": self._guardrail_lock_payload(
-                    False,
-                    trade_count,
-                    settings,
-                    target_date,
-                ),
-                "settings": self._settings_payload(settings, target_date),
-                "checks": [],
-                "scorecard": self._scorecard(
-                    settings,
-                    trades,
-                    opened_trades,
-                    target_date,
-                    [],
-                    trade_count=trade_count,
-                    floating_pnl=live_floating_pnl,
-                    open_positions=live_positions,
-                ),
-            }
+            return self._response_builder.build_disabled_status(
+                account_id=account_id,
+                target_date=target_date,
+                settings=settings,
+                trades=trades,
+                opened_trades=opened_trades,
+                trade_count=trade_count,
+                floating_pnl=live_floating_pnl,
+                open_positions=live_positions,
+            )
 
         live_checks = self._block_pipeline.evaluate_rules(
             input_data=RuleEvaluationInput(
@@ -158,47 +161,22 @@ class GuardrailService:
         if trade_blocking_enabled and block_state["active"]:
             trade_blocked = True
 
-        return {
-            "account_id": account_id,
-            "mode": "mt5_enforcement" if trade_blocking_enabled else "local_read_only",
-            "trade_blocking_enabled": trade_blocking_enabled,
-            "trade_blocked": trade_blocked,
-            "trade_block": self._trade_block_payload(
-                trade_blocking_enabled,
-                trade_block_reasons,
-            ),
-            "block_state": block_state,
-            "enabled": settings.enabled,
-            "date": target_date.isoformat(),
-            "status": "blocked" if trade_blocked else ("warning" if active_breaks else "clear"),
-            "summary": {
-                "triggered_count": len(active_breaks),
-                "critical_count": len(
-                    [item for item in active_breaks if item["severity"] == "critical"]
-                ),
-                "warning_count": len(
-                    [item for item in active_breaks if item["severity"] == "warning"]
-                ),
-            },
-            "guardrail_lock": self._guardrail_lock_payload(
-                trade_blocked,
-                trade_count,
-                settings,
-                target_date,
-            ),
-            "settings": self._settings_payload(settings, target_date),
-            "checks": checks,
-            "scorecard": self._scorecard(
-                settings,
-                trades,
-                opened_trades,
-                target_date,
-                checks,
-                trade_count=trade_count,
-                floating_pnl=live_floating_pnl,
-                open_positions=live_positions,
-            ),
-        }
+        return self._response_builder.build_status(
+            account_id=account_id,
+            target_date=target_date,
+            settings=settings,
+            trades=trades,
+            opened_trades=opened_trades,
+            checks=checks,
+            active_breaks=active_breaks,
+            trade_count=trade_count,
+            floating_pnl=live_floating_pnl,
+            open_positions=live_positions,
+            trade_blocking_enabled=trade_blocking_enabled,
+            trade_blocked=trade_blocked,
+            trade_block_reasons=trade_block_reasons,
+            block_state=block_state,
+        )
 
     def trade_block_status(
         self,
@@ -213,17 +191,10 @@ class GuardrailService:
             floating_pnl=floating_pnl,
             open_positions=open_positions,
         )
-        block_state = status.get("block_state", {})
-        return {
-            "account_id": status["account_id"],
-            "date": status["date"],
-            "allowed": not status["trade_blocked"],
-            "blocked": status["trade_blocked"],
-            "trade_blocking_enabled": status["trade_blocking_enabled"],
-            "reasons": status["trade_block"]["reasons"],
-            "block_state": block_state,
-            "floating_pnl": floating_pnl,
-        }
+        return self._response_builder.build_trade_block_status(
+            status=status,
+            floating_pnl=floating_pnl,
+        )
 
     def patch_settings(
         self,
@@ -239,13 +210,13 @@ class GuardrailService:
         target_date = self._today()
         trade_count = self._trade_entry_count(account_id, target_date)
         if trade_count > 0:
-            self._schedule_settings_for_next_day(
+            self._settings_lock.schedule_settings_for_next_day(
                 settings,
                 changes,
                 target_date + timedelta(days=1),
             )
         else:
-            self._apply_settings_changes(settings, changes)
+            self._settings_lock.apply_settings_changes(settings, changes)
 
         self._db.commit()
         self._db.refresh(settings)
@@ -287,7 +258,7 @@ class GuardrailService:
             .first()
         )
         if settings is not None:
-            self._rollover_pending_settings_if_due(settings)
+            self._settings_lock.rollover_pending_settings_if_due(settings)
             return settings
 
         settings = GuardrailSetting(
@@ -328,35 +299,14 @@ class GuardrailService:
         account_id: int,
         target_date: date,
     ) -> list[NormalizedTrade]:
-        start, end = self._trading_day_bounds(target_date)
-        return (
-            self._db.query(NormalizedTrade)
-            .filter(
-                NormalizedTrade.account_id == account_id,
-                NormalizedTrade.closed_at >= start,
-                NormalizedTrade.closed_at < end,
-                NormalizedTrade.status.in_(["closed", "breakeven"]),
-            )
-            .order_by(NormalizedTrade.closed_at.asc(), NormalizedTrade.id.asc())
-            .all()
-        )
+        return self._data_collector.trades_for_day(account_id, target_date)
 
     def _trades_opened_for_day(
         self,
         account_id: int,
         target_date: date,
     ) -> list[NormalizedTrade]:
-        start, end = self._trading_day_bounds(target_date)
-        return (
-            self._db.query(NormalizedTrade)
-            .filter(
-                NormalizedTrade.account_id == account_id,
-                NormalizedTrade.opened_at >= start,
-                NormalizedTrade.opened_at < end,
-            )
-            .order_by(NormalizedTrade.opened_at.asc(), NormalizedTrade.id.asc())
-            .all()
-        )
+        return self._data_collector.trades_opened_for_day(account_id, target_date)
 
     def _trade_entry_count(
         self,
@@ -364,66 +314,14 @@ class GuardrailService:
         target_date: date,
         open_positions: list[dict] | None = None,
     ) -> int:
-        start, end = self._trading_day_bounds(target_date)
-        entry_deals = (
-            self._db.query(RawDeal)
-            .filter(
-                RawDeal.account_id == account_id,
-                RawDeal.deal_time >= start,
-                RawDeal.deal_time < end,
-            )
-            .order_by(RawDeal.deal_time.asc(), RawDeal.id.asc())
-            .all()
+        return self._data_collector.trade_entry_count(
+            account_id,
+            target_date,
+            open_positions=open_positions,
         )
-        opened_trades = self._trades_opened_for_day(account_id, target_date)
-
-        trade_keys = {
-            self._trade_entry_signature(
-                symbol=deal.symbol,
-                direction=self._deal_direction(deal),
-                opened_at=deal.deal_time,
-                volume=deal.volume,
-            )
-            for deal in entry_deals
-            if self._is_open_deal(deal)
-        }
-
-        for trade in opened_trades:
-            trade_keys.add(
-                self._trade_entry_signature(
-                    symbol=trade.symbol,
-                    direction=trade.direction,
-                    opened_at=trade.opened_at,
-                    volume=trade.volume,
-                )
-            )
-
-        live_positions = (
-            open_positions
-            if open_positions is not None
-            else self._latest_open_positions(account_id)
-        )
-        for position in live_positions:
-            opened_at = self._position_opened_at(position)
-            if opened_at is None or opened_at < start or opened_at >= end:
-                continue
-            trade_keys.add(
-                self._trade_entry_signature(
-                    symbol=str(position.get("symbol") or ""),
-                    direction=str(position.get("direction") or ""),
-                    opened_at=opened_at,
-                    volume=self._position_volume(position),
-                )
-            )
-
-        return len(trade_keys)
 
     def _trading_day_bounds(self, target_date: date) -> tuple[datetime, datetime]:
-        # MT5 datetimes are persisted and rendered in the app using the same
-        # naive wall-clock values, so daily rule checks must use that same
-        # trading-day boundary instead of shifting again for UTC+7.
-        start = datetime.combine(target_date, time.min)
-        return start, start + timedelta(days=1)
+        return self._data_collector.trading_day_bounds(target_date)
 
     def _trade_entry_signature(
         self,
@@ -442,53 +340,13 @@ class GuardrailService:
         )
 
     def _latest_open_positions(self, account_id: int) -> list[dict]:
-        latest = (
-            self._db.query(RawPosition.captured_at)
-            .filter(RawPosition.account_id == account_id)
-            .order_by(RawPosition.captured_at.desc(), RawPosition.id.desc())
-            .first()
-        )
-        if latest is None:
-            return []
-        positions = (
-            self._db.query(RawPosition)
-            .filter(
-                RawPosition.account_id == account_id,
-                RawPosition.captured_at == latest[0],
-            )
-            .order_by(RawPosition.opened_at.asc(), RawPosition.id.asc())
-            .all()
-        )
-        return [
-            {
-                "external_position_id": position.external_position_id,
-                "symbol": position.symbol,
-                "direction": position.direction,
-                "volume": position.volume,
-                "profit": position.profit,
-                "opened_at": position.opened_at,
-                "open_price": position.open_price,
-                "current_price": position.current_price,
-                "stop_loss": position.stop_loss,
-                "take_profit": position.take_profit,
-                "captured_at": position.captured_at,
-            }
-            for position in positions
-        ]
+        return self._data_collector.latest_open_positions(account_id)
 
     def _floating_pnl_from_positions(self, positions: list[dict]) -> float:
-        return round(sum(self._position_profit(position) for position in positions), 2)
+        return self._data_collector.floating_pnl_from_positions(positions)
 
     def _open_rule_breaks(self, account_id: int) -> list[RuleBreak]:
-        return (
-            self._db.query(RuleBreak)
-            .filter(
-                RuleBreak.account_id == account_id,
-                RuleBreak.resolved_at.is_(None),
-            )
-            .order_by(RuleBreak.detected_at.desc(), RuleBreak.id.desc())
-            .all()
-        )
+        return self._data_collector.open_rule_breaks(account_id)
 
     def _today(self) -> date:
         return datetime.now().date()
@@ -500,48 +358,19 @@ class GuardrailService:
         settings: GuardrailSetting | None = None,
         target_date: date | None = None,
     ) -> dict:
-        effective_today_locked = trade_count > 0 or trade_blocked
-        if trade_blocked:
-            reason = "blocked_until_next_trading_day"
-            message = (
-                "Today's rules are locked because a blocking rule was hit. "
-                "Any saved changes apply on the next trading day."
-            )
-        elif trade_count > 0:
-            reason = "next_day_pending_only"
-            message = (
-                "Trades already exist today. Rule edits are saved for the next "
-                "trading day."
-            )
-        else:
-            reason = "editable"
-            message = "Guardrails are editable for today."
-        return {
-            "hard_locked": False,
-            "tighten_only": effective_today_locked,
-            "effective_today_locked": effective_today_locked,
-            "trade_count": trade_count,
-            "timezone": "Local",
-            "reason": reason,
-            "message": message,
-            "pending_update": self._pending_update_payload(settings, target_date),
-        }
+        return self._settings_lock.guardrail_lock_payload(
+            trade_blocked,
+            trade_count,
+            settings,
+            target_date,
+        )
 
     def _apply_settings_changes(
         self,
         settings: GuardrailSetting,
         changes: dict,
     ) -> None:
-        nested_changes = dict(changes.get("settings") or {})
-        for key, value in changes.items():
-            if key == "settings":
-                continue
-            setattr(settings, key, value)
-
-        nested = dict(settings.settings or {})
-        nested.pop("pending_update", None)
-        nested.update(nested_changes)
-        settings.settings = nested
+        self._settings_lock.apply_settings_changes(settings, changes)
 
     def _schedule_settings_for_next_day(
         self,
@@ -549,64 +378,27 @@ class GuardrailService:
         changes: dict,
         effective_date: date,
     ) -> None:
-        nested = dict(settings.settings or {})
-        nested["pending_update"] = {
-            "effective_date": effective_date.isoformat(),
-            "saved_at": datetime.utcnow().isoformat(),
-            "changes": changes,
-        }
-        settings.settings = nested
+        self._settings_lock.schedule_settings_for_next_day(
+            settings,
+            changes,
+            effective_date,
+        )
 
     def _rollover_pending_settings_if_due(self, settings: GuardrailSetting) -> None:
-        pending = self._pending_update(settings)
-        if pending is None:
-            return
-        effective_date = self._parse_iso_date(pending.get("effective_date"))
-        if effective_date is None or effective_date > self._today():
-            return
-        changes = pending.get("changes")
-        if isinstance(changes, dict):
-            self._apply_settings_changes(settings, changes)
-        nested = dict(settings.settings or {})
-        nested.pop("pending_update", None)
-        settings.settings = nested
-        self._db.commit()
-        self._db.refresh(settings)
+        self._settings_lock.rollover_pending_settings_if_due(settings)
 
     def _pending_update(self, settings: GuardrailSetting | None) -> dict | None:
-        if settings is None:
-            return None
-        pending = (settings.settings or {}).get("pending_update")
-        return pending if isinstance(pending, dict) else None
+        return self._settings_lock.pending_update(settings)
 
     def _pending_update_payload(
         self,
         settings: GuardrailSetting | None,
         target_date: date | None = None,
     ) -> dict | None:
-        pending = self._pending_update(settings)
-        if pending is None:
-            return None
-        effective_date = self._parse_iso_date(pending.get("effective_date"))
-        changes = pending.get("changes")
-        return {
-            "effective_date": effective_date.isoformat() if effective_date else None,
-            "saved_at": pending.get("saved_at"),
-            "changes": changes if isinstance(changes, dict) else {},
-            "active_for_date": bool(
-                effective_date is not None
-                and target_date is not None
-                and effective_date <= target_date
-            ),
-        }
+        return self._settings_lock.pending_update_payload(settings, target_date)
 
     def _parse_iso_date(self, value: object) -> date | None:
-        if not value:
-            return None
-        try:
-            return date.fromisoformat(str(value))
-        except ValueError:
-            return None
+        return self._settings_lock.parse_iso_date(value)
 
     def _daily_loss_check(
         self,
@@ -1021,35 +813,7 @@ class GuardrailService:
         )
 
     def _sync_rule_breaks(self, account_id: int, checks: list[dict]) -> None:
-        existing = {
-            rule_break.rule_code: rule_break
-            for rule_break in self._open_rule_breaks(account_id)
-        }
-        now = datetime.utcnow()
-
-        for check in checks:
-            current = existing.get(check["rule_code"])
-            if check["triggered"]:
-                if current is None:
-                    self._db.add(
-                        RuleBreak(
-                            account_id=account_id,
-                            trade_id=None,
-                            rule_code=check["rule_code"],
-                            severity=check["severity"],
-                            message=check["message"],
-                            detected_at=now,
-                            payload=check["payload"],
-                        )
-                    )
-                else:
-                    current.severity = check["severity"]
-                    current.message = check["message"]
-                    current.payload = check["payload"]
-            elif current is not None:
-                current.resolved_at = now
-
-        self._db.commit()
+        self._rule_break_sync.sync_rule_breaks(account_id, checks)
 
     def _check_payload(
         self,
@@ -1142,37 +906,16 @@ class GuardrailService:
         floating_pnl: float | None = None,
         open_positions: list[dict] | None = None,
     ) -> dict:
-        check_map = {check["rule_code"]: check for check in checks}
-        trade_blocking_enabled = self._setting_enabled(
+        return self._score_service.build_scorecard(
             settings,
-            "trade_blocking_enabled",
-            False,
+            trades,
+            opened_trades,
+            target_date,
+            checks,
+            trade_count=trade_count,
+            floating_pnl=floating_pnl,
+            open_positions=open_positions,
         )
-        categories = [
-            self._performance_score_rows(trades),
-            self._discipline_score_rows(
-                settings,
-                trades,
-                opened_trades,
-                target_date,
-                check_map,
-                trade_count=trade_count,
-                trade_blocking_enabled=trade_blocking_enabled,
-                open_positions=open_positions,
-            ),
-            self._consistency_score_rows(settings, trades, target_date),
-        ]
-        total_points = round(sum(category["earned_points"] for category in categories), 2)
-        max_points = round(sum(category["max_points"] for category in categories), 2)
-        return {
-            "date": target_date.isoformat(),
-            "trade_blocking_enabled": trade_blocking_enabled,
-            "floating_pnl": round(floating_pnl or 0, 2),
-            "total_points": total_points,
-            "max_points": max_points,
-            "percent": round((total_points / max_points) * 100, 2) if max_points > 0 else 0,
-            "categories": categories,
-        }
 
     def _performance_score_rows(self, trades: list[NormalizedTrade]) -> dict:
         summary = self._trade_metric_summary(trades)
