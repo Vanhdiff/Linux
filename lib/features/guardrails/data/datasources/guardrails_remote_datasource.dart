@@ -14,6 +14,23 @@ class GuardrailsRemoteDataSource {
     return response as Map<String, dynamic>;
   }
 
+  Future<Map<String, dynamic>> fetchBlockState({required int accountId}) async {
+    final response = await _apiClient.getJson(
+      '/api/guardrails/block-state',
+      queryParameters: {'account_id': '$accountId'},
+    );
+    return response as Map<String, dynamic>;
+  }
+
+  Future<Map<String, dynamic>> resolveBlock({required int accountId}) async {
+    final response = await _apiClient.postJson(
+      '/api/guardrails/resolve-block',
+      {},
+      queryParameters: {'account_id': '$accountId'},
+    );
+    return response as Map<String, dynamic>;
+  }
+
   Future<Map<String, dynamic>> fetchMt5TradeBlockerStatus() async {
     final response = await _apiClient.getJson('/api/mt5/trade-blocker/status');
     return response as Map<String, dynamic>;

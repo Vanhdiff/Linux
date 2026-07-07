@@ -40,6 +40,13 @@ LICENSE_EXEMPT_PATHS = {
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     init_db()
+
+    # Phase 1A: Recover block state from database on startup
+    _restore_block_state()
+
+    # Phase 1A: Start scheduler for expired block cleanup
+    scheduler_task = asyncio.create_task(_run_block_scheduler())
+
     app.state.mt5_trade_blocker = None
     app.state.mt5_trade_blocker_task = None
     with SessionLocal() as db:
@@ -52,11 +59,88 @@ async def lifespan(app: FastAPI):
     try:
         yield
     finally:
+        scheduler_task.cancel()
+        with suppress(asyncio.CancelledError):
+            await scheduler_task
         task = getattr(app.state, "mt5_trade_blocker_task", None)
         if task is not None:
             task.cancel()
             with suppress(asyncio.CancelledError):
                 await task
+
+
+def _restore_block_state():
+    """
+    Restore block state from database on startup.
+
+    This ensures that any blocks that were active before restart
+    are properly restored and enforced.
+    """
+    import logging
+    from app.infrastructure.persistence.block_repository import BlockRepository
+
+    logger = logging.getLogger(__name__)
+
+    with SessionLocal() as db:
+        repo = BlockRepository(db)
+        cleaned_blocks = repo.cleanup_expired_blocks()
+        active_blocks = repo.restore_active_blocks()
+
+        if cleaned_blocks:
+            logger.info(
+                f"Block state recovery: {len(cleaned_blocks)} expired blocks cleaned up"
+            )
+
+        if active_blocks:
+            logger.info(
+                f"Block state recovery: {len(active_blocks)} active blocks restored"
+            )
+            for block in active_blocks:
+                logger.info(
+                    f"  - Account {block.account_id}: "
+                    f"{block.block_type.value} block "
+                    f"(expires: {block.expires_at})"
+                )
+        else:
+            logger.info("Block state recovery: No active blocks to restore")
+
+
+async def _run_block_scheduler():
+    """
+    Background scheduler for block-related periodic tasks.
+
+    Runs every 60 seconds to:
+    - Check and resolve expired blocks
+    - Prepare for next trading day
+    """
+    import logging
+    import asyncio
+    from app.infrastructure.persistence.block_repository import BlockRepository
+
+    logger = logging.getLogger(__name__)
+    check_interval = 60  # Check every 60 seconds
+
+    logger.info("Block scheduler started")
+
+    while True:
+        try:
+            with SessionLocal() as db:
+                repo = BlockRepository(db)
+
+                # Check for expired blocks
+                expired_blocks = repo.cleanup_expired_blocks()
+                if expired_blocks:
+                    logger.info(f"Found {len(expired_blocks)} expired blocks to resolve")
+
+                # Log current active block count
+                active_count = repo.count_active_blocks()
+                if active_count > 0:
+                    logger.debug(f"Active blocks: {active_count}")
+
+        except Exception as e:
+            logger.error(f"Block scheduler error: {e}")
+
+        await asyncio.sleep(check_interval)
 
 
 def create_app() -> FastAPI:

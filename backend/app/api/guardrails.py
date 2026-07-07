@@ -34,6 +34,22 @@ def trade_block_status(
     return GuardrailService(db).trade_block_status(account_id, trade_date)
 
 
+@router.get("/block-state")
+def block_state(
+    db: Annotated[Session, Depends(get_db)],
+    account_id: Annotated[int, Query(ge=1)],
+):
+    return GuardrailService(db).block_state(account_id)
+
+
+@router.post("/resolve-block")
+def resolve_block(
+    db: Annotated[Session, Depends(get_db)],
+    account_id: Annotated[int, Query(ge=1)],
+):
+    return GuardrailService(db).resolve_block(account_id)
+
+
 @router.patch("/settings", response_model=GuardrailSettingsRead)
 def patch_settings(
     payload: GuardrailSettingsPatch,

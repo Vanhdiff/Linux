@@ -50,7 +50,7 @@ class _NotebookTemplatesBoardState extends State<NotebookTemplatesBoard> {
       decoration: BoxDecoration(
         color: AppColors.surface,
         borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: AppColors.border.withValues(alpha: 0.6)),
+        border: Border.all(color: AppColors.border),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -240,9 +240,9 @@ class _NotebookTemplatesBoardState extends State<NotebookTemplatesBoard> {
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
             decoration: BoxDecoration(
-              color: AppColors.primarySoft.withValues(alpha: 0.5),
+              color: AppColors.primarySoft.withValues(alpha: 0.6),
               borderRadius: BorderRadius.circular(8),
-              border: Border.all(color: AppColors.primary.withValues(alpha: 0.12)),
+              border: Border.all(color: AppColors.primary.withValues(alpha: 0.2)),
             ),
             child: Row(
               mainAxisAlignment: MainAxisAlignment.center,
@@ -497,7 +497,7 @@ class _FolderSectionHeaderState extends State<_FolderSectionHeader> {
                   child: Icon(
                     FluentIcons.tiles,
                     size: 13,
-                    color: widget.isGridView ? AppColors.primary : AppColors.textSecondary.withValues(alpha: 0.7),
+                    color: widget.isGridView ? AppColors.primary : AppColors.textSecondary,
                   ),
                 ),
               ),
@@ -514,7 +514,7 @@ class _FolderSectionHeaderState extends State<_FolderSectionHeader> {
                   child: Icon(
                     FluentIcons.list,
                     size: 13,
-                    color: !widget.isGridView ? AppColors.primary : AppColors.textSecondary.withValues(alpha: 0.7),
+                    color: !widget.isGridView ? AppColors.primary : AppColors.textSecondary,
                   ),
                 ),
               ),
@@ -545,14 +545,14 @@ class _EmptyFolder extends StatelessWidget {
       height: 72,
       alignment: Alignment.center,
       decoration: BoxDecoration(
-        color: AppColors.shellBg.withValues(alpha: 0.2),
+        color: AppColors.shellBg,
         borderRadius: BorderRadius.circular(8),
-        border: Border.all(color: AppColors.border.withValues(alpha: 0.6)),
+        border: Border.all(color: AppColors.border),
       ),
       child: Text(
         message,
         style: TextStyle(
-          color: AppColors.textSecondary.withValues(alpha: 0.7),
+          color: AppColors.textSecondary,
           fontSize: 12,
           fontWeight: FontWeight.w600,
         ),
@@ -584,8 +584,8 @@ class _TemplateCard extends StatelessWidget {
         padding: const EdgeInsets.all(14),
         decoration: BoxDecoration(
           color: selected
-              ? AppColors.primarySoft.withValues(alpha: 0.3)
-              : Colors.white,
+              ? AppColors.primarySoft.withValues(alpha: 0.5)
+              : AppColors.surface,
           borderRadius: BorderRadius.circular(10),
           border: Border.all(
             color: selected ? AppColors.primary : AppColors.border,
@@ -593,8 +593,8 @@ class _TemplateCard extends StatelessWidget {
           ),
           boxShadow: [
             BoxShadow(
-              color: Colors.black.withValues(alpha: 0.015),
-              blurRadius: 10,
+              color: Colors.black.withValues(alpha: 0.06),
+              blurRadius: 12,
               offset: const Offset(0, 4),
             ),
           ],
@@ -639,7 +639,7 @@ class _TemplateCard extends StatelessWidget {
                   child: Icon(
                     FluentIcons.more,
                     size: 12,
-                    color: AppColors.textSecondary.withValues(alpha: 0.6),
+                    color: AppColors.textSecondary,
                   ),
                 ),
               ],
@@ -663,7 +663,7 @@ class _TemplateCard extends StatelessWidget {
               updatedText,
               style: TextStyle(
                 fontSize: 10,
-                color: AppColors.textSecondary.withValues(alpha: 0.55),
+                color: AppColors.textSecondary,
                 fontWeight: FontWeight.w500,
               ),
             ),
@@ -724,7 +724,7 @@ class _TemplateListRow extends StatelessWidget {
         margin: const EdgeInsets.only(bottom: 8),
         padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
         decoration: BoxDecoration(
-          color: selected ? AppColors.primarySoft.withValues(alpha: 0.3) : Colors.white,
+          color: selected ? AppColors.primarySoft.withValues(alpha: 0.5) : AppColors.surface,
           borderRadius: BorderRadius.circular(8),
           border: Border.all(
             color: selected ? AppColors.primary : AppColors.border,
@@ -762,14 +762,14 @@ class _TemplateListRow extends StatelessWidget {
               updatedText,
               style: TextStyle(
                 fontSize: 11,
-                color: AppColors.textSecondary.withValues(alpha: 0.6),
+                color: AppColors.textSecondary,
               ),
             ),
             const SizedBox(width: 12),
             Icon(
               FluentIcons.more,
               size: 12,
-              color: AppColors.textSecondary.withValues(alpha: 0.6),
+              color: AppColors.textSecondary,
             ),
           ],
         ),

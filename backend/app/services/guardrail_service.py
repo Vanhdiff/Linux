@@ -1,4 +1,5 @@
 from datetime import date, datetime, time, timedelta
+from typing import Any
 
 from fastapi import HTTPException
 from sqlalchemy.orm import Session
@@ -14,11 +15,20 @@ from app.models import (
     TradingAccount,
 )
 from app.schemas.guardrail import GuardrailSettingsPatch
+from app.services.block_state_service import BlockStateService
+
+# Phase 1B: New engines for separated concerns
+from app.domain.services.rule_engine import RuleEngine, RuleEvaluationInput
+from app.application.block_decision_engine import BlockDecisionEngine
 
 
 class GuardrailService:
     def __init__(self, db: Session) -> None:
         self._db = db
+        self._block_state = BlockStateService(db)
+        # Phase 1B: Initialize new engines
+        self._rule_engine = RuleEngine()
+        self._decision_engine = BlockDecisionEngine(db)
 
     def status(
         self,
@@ -55,6 +65,11 @@ class GuardrailService:
                 "trade_blocking_enabled": False,
                 "trade_blocked": False,
                 "trade_block": self._trade_block_payload(False, []),
+                "block_state": {
+                    "active": False,
+                    "block_type": None,
+                    "remaining_seconds": 0,
+                },
                 "enabled": False,
                 "date": target_date.isoformat(),
                 "status": "disabled",
@@ -125,6 +140,25 @@ class GuardrailService:
         trade_block_reasons = self._trade_block_reasons(settings, checks)
         trade_blocked = trade_blocking_enabled and bool(trade_block_reasons)
 
+        # ----- Block state persistence -----
+        block_state: dict[str, Any] = {
+            "active": False,
+            "block_type": None,
+            "remaining_seconds": 0,
+        }
+        if trade_blocked and trade_block_reasons:
+            block_obj = self._block_state.apply_block(
+                account_id,
+                trade_block_reasons,
+            )
+            if block_obj is not None:
+                # If a block was applied, update trade_blocked from the persisted
+                # state so the response stays consistent with the database.
+                block_state = self._block_state.block_status(account_id)
+                trade_blocked = block_state["active"]
+            else:
+                block_state["active"] = False
+
         return {
             "account_id": account_id,
             "mode": "mt5_enforcement" if trade_blocking_enabled else "local_read_only",
@@ -134,6 +168,7 @@ class GuardrailService:
                 trade_blocking_enabled,
                 trade_block_reasons,
             ),
+            "block_state": block_state,
             "enabled": settings.enabled,
             "date": target_date.isoformat(),
             "status": "blocked" if trade_blocked else ("warning" if active_breaks else "clear"),
@@ -179,6 +214,7 @@ class GuardrailService:
             floating_pnl=floating_pnl,
             open_positions=open_positions,
         )
+        block_state = status.get("block_state", {})
         return {
             "account_id": status["account_id"],
             "date": status["date"],
@@ -186,6 +222,7 @@ class GuardrailService:
             "blocked": status["trade_blocked"],
             "trade_blocking_enabled": status["trade_blocking_enabled"],
             "reasons": status["trade_block"]["reasons"],
+            "block_state": block_state,
             "floating_pnl": floating_pnl,
         }
 
@@ -225,6 +262,17 @@ class GuardrailService:
         if not include_resolved:
             query = query.filter(RuleBreak.resolved_at.is_(None))
         return query.order_by(RuleBreak.detected_at.desc(), RuleBreak.id.desc()).all()
+
+    def resolve_block(self, account_id: int) -> dict:
+        """Manually resolve the active trading block for an account."""
+        self._ensure_account(account_id)
+        return self._block_state.resolve_block(account_id)
+
+    def block_state(self, account_id: int) -> dict:
+        """Return lightweight block status for the frontend."""
+        self._ensure_account(account_id)
+        self._block_state.resolve_expired_blocks(account_id)
+        return self._block_state.block_status(account_id)
 
     def _ensure_account(self, account_id: int) -> TradingAccount:
         account = self._db.get(TradingAccount, account_id)

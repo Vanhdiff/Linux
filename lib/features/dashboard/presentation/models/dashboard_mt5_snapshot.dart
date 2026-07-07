@@ -307,6 +307,7 @@ class DashboardGuardrailStatus {
   final String? tradingWindowEnd;
   final List<DashboardGuardrailCheck> checks;
   final DashboardGuardrailScorecard scorecard;
+  final DashboardBlockState blockState;
 
   const DashboardGuardrailStatus({
     required this.enabled,
@@ -324,6 +325,7 @@ class DashboardGuardrailStatus {
     required this.tradingWindowEnd,
     required this.checks,
     required this.scorecard,
+    required this.blockState,
   });
 
   factory DashboardGuardrailStatus.fromJson(Map<String, dynamic> json) {
@@ -351,6 +353,7 @@ class DashboardGuardrailStatus {
         json['checks'],
       ).map((item) => DashboardGuardrailCheck.fromJson(_map(item))).toList(),
       scorecard: DashboardGuardrailScorecard.fromJson(_map(json['scorecard'])),
+      blockState: DashboardBlockState.fromJson(_map(json['block_state'])),
     );
   }
 
@@ -510,6 +513,41 @@ class DashboardGuardrailScoreRow {
       unit: _nullableString(json['unit']),
       earnedPoints: _double(json['earned_points']),
       maxPoints: _double(json['max_points']),
+    );
+  }
+}
+
+class DashboardBlockState {
+  final bool active;
+  final String? blockType;
+  final String? blockedAt;
+  final String? expiresAt;
+  final int remainingSeconds;
+  final List<String> triggeredBy;
+  final bool fullDayBlock;
+
+  const DashboardBlockState({
+    required this.active,
+    required this.blockType,
+    required this.blockedAt,
+    required this.expiresAt,
+    required this.remainingSeconds,
+    required this.triggeredBy,
+    required this.fullDayBlock,
+  });
+
+  factory DashboardBlockState.fromJson(Map<String, dynamic> json) {
+    return DashboardBlockState(
+      active: json['active'] as bool? ?? false,
+      blockType: _nullableString(json['block_type']),
+      blockedAt: _nullableString(json['blocked_at']),
+      expiresAt: _nullableString(json['expires_at']),
+      remainingSeconds: _int(json['remaining_seconds']),
+      triggeredBy: (json['triggered_by'] as List<dynamic>?)
+              ?.map((e) => e.toString())
+              .toList(growable: false) ??
+          const [],
+      fullDayBlock: json['full_day_block'] as bool? ?? false,
     );
   }
 }

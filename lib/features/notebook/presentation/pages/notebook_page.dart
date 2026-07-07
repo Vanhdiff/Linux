@@ -43,9 +43,7 @@ class _NotebookPageState extends State<NotebookPage> {
   @override
   Widget build(BuildContext context) {
     return Container(
-      color: AppColors.shellBg.withValues(
-        alpha: 0.4,
-      ), // light grey/white background matching screenshot
+      color: AppColors.shellBg,
       child: LayoutBuilder(
         builder: (context, constraints) {
           const horizontalPadding = 24.0;
@@ -767,14 +765,14 @@ class _NotebookEditor extends StatelessWidget {
       constraints: BoxConstraints(minHeight: 820),
       padding: EdgeInsets.fromLTRB(22, 20, 22, 22),
       decoration: BoxDecoration(
-        color: AppColors.surface.withValues(alpha: 0.94),
+        color: AppColors.surface,
         borderRadius: BorderRadius.circular(10),
         border: Border.all(color: AppColors.border),
         boxShadow: [
           BoxShadow(
-            color: AppColors.primary.withValues(alpha: 0.04),
-            blurRadius: 18,
-            offset: Offset(0, 10),
+            color: AppColors.primary.withValues(alpha: 0.08),
+            blurRadius: 24,
+            offset: Offset(0, 12),
           ),
         ],
       ),

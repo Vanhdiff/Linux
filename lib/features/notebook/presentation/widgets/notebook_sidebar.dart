@@ -60,7 +60,7 @@ class _NotebookSidebarState extends State<NotebookSidebar> {
       decoration: BoxDecoration(
         color: AppColors.surface,
         borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: AppColors.border.withValues(alpha: 0.6)),
+        border: Border.all(color: AppColors.border),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -88,7 +88,7 @@ class _NotebookSidebarState extends State<NotebookSidebar> {
                 padding: const EdgeInsets.only(left: 8.0, top: 4, bottom: 8),
                 child: Text(
                   strings.text('No pinned notes'),
-                  style: TextStyle(fontSize: 12, color: AppColors.textSecondary.withValues(alpha: 0.6)),
+                  style: TextStyle(fontSize: 12, color: AppColors.textSecondary),
                 ),
               )
             else
@@ -116,7 +116,7 @@ class _NotebookSidebarState extends State<NotebookSidebar> {
                 padding: const EdgeInsets.only(left: 8.0, top: 4, bottom: 8),
                 child: Text(
                   strings.text('No recent notes'),
-                  style: TextStyle(fontSize: 12, color: AppColors.textSecondary.withValues(alpha: 0.6)),
+                  style: TextStyle(fontSize: 12, color: AppColors.textSecondary),
                 ),
               )
             else
@@ -202,7 +202,7 @@ class _SearchBox extends StatelessWidget {
                 child: Icon(
                   FluentIcons.search,
                   size: 13,
-                  color: AppColors.textSecondary.withValues(alpha: 0.8),
+                  color: AppColors.textSecondary,
                 ),
               ),
               suffix: Padding(
@@ -211,22 +211,22 @@ class _SearchBox extends StatelessWidget {
                   '⌘K',
                   style: TextStyle(
                     fontSize: 10,
-                    color: AppColors.textSecondary.withValues(alpha: 0.5),
+                    color: AppColors.textSecondary,
                     fontWeight: FontWeight.w600,
                   ),
                 ),
               ),
               placeholderStyle: TextStyle(
                 fontSize: 12,
-                color: AppColors.textSecondary.withValues(alpha: 0.6),
+                color: AppColors.textSecondary,
                 fontWeight: FontWeight.w500,
               ),
               style: TextStyle(fontSize: 12, color: AppColors.textPrimary),
               decoration: WidgetStatePropertyAll(
                 BoxDecoration(
-                  color: AppColors.shellBg.withValues(alpha: 0.5),
+                  color: AppColors.shellBg,
                   borderRadius: BorderRadius.circular(8),
-                  border: Border.all(color: AppColors.border.withValues(alpha: 0.8)),
+                  border: Border.all(color: AppColors.border),
                 ),
               ),
             ),
@@ -271,16 +271,16 @@ class _EmptySearchResult extends StatelessWidget {
       width: double.infinity,
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 12),
       decoration: BoxDecoration(
-        color: AppColors.shellBg.withValues(alpha: 0.3),
+        color: AppColors.shellBg,
         borderRadius: BorderRadius.circular(8),
-        border: Border.all(color: AppColors.border.withValues(alpha: 0.6)),
+        border: Border.all(color: AppColors.border),
       ),
       child: Text(
         hasQuery
             ? strings.text('No matching notes')
             : strings.text('No notes yet'),
         style: TextStyle(
-          color: AppColors.textSecondary.withValues(alpha: 0.8),
+          color: AppColors.textSecondary,
           fontSize: 11,
           fontWeight: FontWeight.w600,
         ),
@@ -324,7 +324,7 @@ class _SectionHeader extends StatelessWidget {
                   ? FluentIcons.chevron_down_small
                   : FluentIcons.chevron_right_small,
               size: 10,
-              color: AppColors.textSecondary.withValues(alpha: 0.7),
+              color: AppColors.textSecondary,
             ),
           ],
         ),
@@ -481,13 +481,13 @@ class _NoteTileState extends State<_NoteTile> {
             decoration: BoxDecoration(
               color: widget.selected
                   ? AppColors.primarySoft
-                  : (_isHovered ? AppColors.shellBg.withValues(alpha: 0.7) : Colors.transparent),
+                  : (_isHovered ? AppColors.shellBg : Colors.transparent),
               borderRadius: BorderRadius.circular(10),
               border: Border.all(
                 color: widget.selected
-                    ? AppColors.primary.withValues(alpha: 0.25)
+                    ? AppColors.primary.withValues(alpha: 0.45)
                     : Colors.transparent,
-                width: 1,
+                width: 1.5,
               ),
             ),
             child: Row(
@@ -544,7 +544,7 @@ class _NoteTileState extends State<_NoteTile> {
                         overflow: TextOverflow.ellipsis,
                         style: TextStyle(
                           fontSize: 11,
-                          color: AppColors.textSecondary.withValues(alpha: 0.85),
+                          color: AppColors.textSecondary,
                           fontWeight: FontWeight.w400,
                           height: 1.3,
                         ),
@@ -554,7 +554,7 @@ class _NoteTileState extends State<_NoteTile> {
                         widget.note.date,
                         style: TextStyle(
                           fontSize: 9.5,
-                          color: AppColors.textSecondary.withValues(alpha: 0.55),
+                          color: AppColors.textSecondary,
                           fontWeight: FontWeight.w500,
                         ),
                       ),

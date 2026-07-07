@@ -421,6 +421,30 @@ class RuleBreak(TimestampMixin, Base):
     trade: Mapped[NormalizedTrade | None] = relationship(back_populates="rule_breaks")
 
 
+class BlockState(TimestampMixin, Base):
+    __tablename__ = "block_states"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    account_id: Mapped[int] = mapped_column(
+        ForeignKey("trading_accounts.id"),
+        index=True,
+    )
+    block_type: Mapped[str] = mapped_column(
+        String(20), default="temporary", index=True
+    )
+    triggered_by: Mapped[dict] = mapped_column(JSON, default=list)
+    blocked_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        server_default=func.now(),
+    )
+    expires_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    resolved_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    auto_resolved: Mapped[bool] = mapped_column(Boolean, default=False)
+    payload: Mapped[dict | None] = mapped_column(JSON)
+
+    account: Mapped[TradingAccount] = relationship()
+
+
 class EconomicEvent(TimestampMixin, Base):
     __tablename__ = "economic_events"
     __table_args__ = (

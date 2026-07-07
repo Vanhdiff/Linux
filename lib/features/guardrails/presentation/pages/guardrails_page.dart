@@ -83,7 +83,9 @@ class _GuardrailsPageState extends State<GuardrailsPage> {
                   ),
                   const SizedBox(height: 14),
                   _StatusStrip(status: _status),
-                  const SizedBox(height: 18),
+                  const SizedBox(height: 14),
+                  _BlockBanner(status: _status),
+                  const SizedBox(height: 14),
                   Row(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
@@ -1308,6 +1310,78 @@ class _IconAction extends StatelessWidget {
           border: Border.all(color: AppColors.border),
         ),
         child: Icon(icon, size: 15, color: AppColors.textSecondary),
+      ),
+    );
+  }
+}
+
+class _BlockBanner extends StatelessWidget {
+  final Map<String, dynamic>? status;
+
+  const _BlockBanner({required this.status});
+
+  @override
+  Widget build(BuildContext context) {
+    final block = status?['block_state'] as Map<String, dynamic>?;
+    if (block == null) return const SizedBox.shrink();
+    final active = block['active'] as bool? ?? false;
+    if (!active) return const SizedBox.shrink();
+
+    final isFullDay = block['full_day_block'] as bool? ?? false;
+    final remaining = (block['remaining_seconds'] as num?)?.toInt() ?? 0;
+    final minutes = remaining ~/ 60;
+    final seconds = remaining % 60;
+    final countdown = isFullDay
+        ? 'Until next trading day'
+        : '${minutes}m ${seconds.toString().padLeft(2, '0')}s';
+    final triggeredBy = block['triggered_by'] as List<dynamic>? ?? [];
+    final triggerInfo = triggeredBy.isNotEmpty
+        ? triggeredBy.map((e) => e.toString()).join(', ')
+        : 'Rule violation';
+
+    return Container(
+      width: double.infinity,
+      padding: EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+      decoration: BoxDecoration(
+        color: (isFullDay ? AppColors.danger : AppColors.warning).withValues(alpha: 0.10),
+        borderRadius: BorderRadius.circular(10),
+        border: Border.all(
+          color: (isFullDay ? AppColors.danger : AppColors.warning).withValues(alpha: 0.20),
+        ),
+      ),
+      child: Row(
+        children: [
+          Icon(
+            isFullDay ? FluentIcons.blocked : FluentIcons.clock,
+            size: 15,
+            color: isFullDay ? AppColors.danger : AppColors.warning,
+          ),
+          SizedBox(width: 8),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  isFullDay ? 'Trading blocked for the day' : 'Trading blocked temporarily',
+                  style: TextStyle(
+                    fontSize: 13,
+                    fontWeight: FontWeight.w700,
+                    color: isFullDay ? AppColors.danger : AppColors.warning,
+                  ),
+                ),
+                SizedBox(height: 2),
+                Text(
+                  '$triggerInfo — $countdown',
+                  style: TextStyle(
+                    fontSize: 11,
+                    fontWeight: FontWeight.w500,
+                    color: (isFullDay ? AppColors.danger : AppColors.warning).withValues(alpha: 0.8),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
       ),
     );
   }
