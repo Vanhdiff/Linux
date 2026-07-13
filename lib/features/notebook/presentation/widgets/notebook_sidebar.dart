@@ -2,7 +2,7 @@ import 'package:fluent_ui/fluent_ui.dart';
 
 import '../../../../app/i18n/app_localization.dart';
 import '../../../../app/theme/app_colors.dart';
-import '../data/notebook_sample_data.dart';
+import '../../data/catalog/notebook_template_catalog.dart';
 
 class NotebookSidebar extends StatefulWidget {
   final List<NotebookNote> pinnedNotes;
@@ -88,7 +88,10 @@ class _NotebookSidebarState extends State<NotebookSidebar> {
                 padding: const EdgeInsets.only(left: 8.0, top: 4, bottom: 8),
                 child: Text(
                   strings.text('No pinned notes'),
-                  style: TextStyle(fontSize: 12, color: AppColors.textSecondary),
+                  style: TextStyle(
+                    fontSize: 12,
+                    color: AppColors.textSecondary,
+                  ),
                 ),
               )
             else
@@ -116,7 +119,10 @@ class _NotebookSidebarState extends State<NotebookSidebar> {
                 padding: const EdgeInsets.only(left: 8.0, top: 4, bottom: 8),
                 child: Text(
                   strings.text('No recent notes'),
-                  style: TextStyle(fontSize: 12, color: AppColors.textSecondary),
+                  style: TextStyle(
+                    fontSize: 12,
+                    color: AppColors.textSecondary,
+                  ),
                 ),
               )
             else
@@ -208,7 +214,7 @@ class _SearchBox extends StatelessWidget {
               suffix: Padding(
                 padding: const EdgeInsets.only(right: 8.0),
                 child: Text(
-                  '⌘K',
+                  'Ctrl K',
                   style: TextStyle(
                     fontSize: 10,
                     color: AppColors.textSecondary,
@@ -244,7 +250,9 @@ class _SearchBox extends StatelessWidget {
               color: hasQuery ? AppColors.shellBg : AppColors.primary,
               borderRadius: BorderRadius.circular(8),
               border: Border.all(
-                color: hasQuery ? AppColors.border : AppColors.primary.withValues(alpha: 0.8),
+                color: hasQuery
+                    ? AppColors.border
+                    : AppColors.primary.withValues(alpha: 0.8),
               ),
             ),
             child: Icon(

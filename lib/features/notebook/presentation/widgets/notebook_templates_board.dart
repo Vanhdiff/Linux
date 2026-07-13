@@ -2,7 +2,7 @@ import 'package:fluent_ui/fluent_ui.dart';
 
 import '../../../../app/i18n/app_localization.dart';
 import '../../../../app/theme/app_colors.dart';
-import '../data/notebook_sample_data.dart';
+import '../../data/catalog/notebook_template_catalog.dart';
 
 class NotebookTemplatesBoard extends StatefulWidget {
   final List<String> categories;
@@ -31,7 +31,7 @@ class NotebookTemplatesBoard extends StatefulWidget {
 class _NotebookTemplatesBoardState extends State<NotebookTemplatesBoard> {
   bool _showPinned = true;
   final Set<String> _collapsedCategories = {};
-  final Map<String, bool> _categoryGridView = {}; // tracks grid vs list view per category
+  final Map<String, bool> _categoryGridView = {};
 
   @override
   Widget build(BuildContext context) {
@@ -41,8 +41,9 @@ class _NotebookTemplatesBoardState extends State<NotebookTemplatesBoard> {
       groupedTemplates.putIfAbsent(template.category, () => []).add(template);
     }
 
-    // Pinned templates filter (find templates that correspond to active pinned notes or just use a mock template)
-    final pinnedTemplates = widget.templates.where((t) => t.title == 'Pre-Market Thesis').toList();
+    final pinnedTemplates = widget.templates
+        .where((t) => t.title == 'Pre-Market Thesis')
+        .toList();
 
     return Container(
       constraints: const BoxConstraints(minHeight: 820),
@@ -55,7 +56,6 @@ class _NotebookTemplatesBoardState extends State<NotebookTemplatesBoard> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // Header Row
           Row(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
@@ -73,7 +73,9 @@ class _NotebookTemplatesBoardState extends State<NotebookTemplatesBoard> {
                     ),
                     const SizedBox(height: 4),
                     Text(
-                      strings.text('Your structured frameworks for better trading decisions.'),
+                      strings.text(
+                        'Your structured frameworks for better trading decisions.',
+                      ),
                       style: TextStyle(
                         fontSize: 13,
                         color: AppColors.textSecondary,
@@ -92,7 +94,9 @@ class _NotebookTemplatesBoardState extends State<NotebookTemplatesBoard> {
                     EdgeInsets.symmetric(horizontal: 14, vertical: 8),
                   ),
                   shape: WidgetStatePropertyAll(
-                    RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                    RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(8),
+                    ),
                   ),
                 ),
                 child: Row(
@@ -114,7 +118,6 @@ class _NotebookTemplatesBoardState extends State<NotebookTemplatesBoard> {
           ),
           const SizedBox(height: 24),
 
-          // Pinned Templates Section
           _FolderSectionHeader(
             title: strings.text('Pinned Templates'),
             count: pinnedTemplates.length,
@@ -134,9 +137,10 @@ class _NotebookTemplatesBoardState extends State<NotebookTemplatesBoard> {
                     .map(
                       (template) => _TemplateCard(
                         template: template,
-                        selected: template.title == widget.selectedTemplateTitle,
+                        selected:
+                            template.title == widget.selectedTemplateTitle,
                         onTap: () => widget.onTemplateSelected(template),
-                        updatedText: 'Updated 2 days ago', // mock matching image
+                        updatedText: _updatedLabel(template.title),
                       ),
                     )
                     .toList(),
@@ -144,105 +148,101 @@ class _NotebookTemplatesBoardState extends State<NotebookTemplatesBoard> {
           ],
           const SizedBox(height: 24),
 
-          // Dynamic Category Folders
-          ...widget.categories.map(
-            (category) {
-              final templates = groupedTemplates[category] ?? const [];
-              final expanded = !_collapsedCategories.contains(category);
-              final isGridView = _categoryGridView[category] ?? true;
+          ...widget.categories.map((category) {
+            final templates = groupedTemplates[category] ?? const [];
+            final expanded = !_collapsedCategories.contains(category);
+            final isGridView = _categoryGridView[category] ?? true;
 
-              // Mock update texts to match design mockup
-              String getMockUpdate(String title) {
-                if (title == 'Pre-Market Thesis') return 'Updated 2 days ago';
-                if (title == 'Trade Review') return 'Updated 1 day ago';
-                if (title == 'Entry Model') return 'Updated 5 hours ago';
-                if (title == 'Emotional Mapping Journal') return 'Updated 3 days ago';
-                if (title == 'Pre-Market Mental Prep') return 'Updated 4 days ago';
-                return 'Updated recently';
-              }
-
-              return Padding(
-                padding: const EdgeInsets.only(bottom: 24.0),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    _FolderSectionHeader(
-                      title: category,
-                      count: templates.length,
-                      expanded: expanded,
-                      onToggle: () {
-                        setState(() {
-                          if (_collapsedCategories.contains(category)) {
-                            _collapsedCategories.remove(category);
-                          } else {
-                            _collapsedCategories.add(category);
-                          }
-                        });
-                      },
-                      icon: category == 'Mindset' ? FluentIcons.heart : FluentIcons.folder_open,
-                      showLayoutSwitcher: expanded && templates.isNotEmpty,
-                      isGridView: isGridView,
-                      onLayoutChanged: (grid) {
-                        setState(() {
-                          _categoryGridView[category] = grid;
-                        });
-                      },
-                      onRename: (nextName) => widget.onCategoryRenamed(category, nextName),
-                      onDelete: () => _confirmDeleteCategory(
-                        context,
-                        category,
-                        templates.length,
-                      ),
+            return Padding(
+              padding: const EdgeInsets.only(bottom: 24.0),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  _FolderSectionHeader(
+                    title: category,
+                    count: templates.length,
+                    expanded: expanded,
+                    onToggle: () {
+                      setState(() {
+                        if (_collapsedCategories.contains(category)) {
+                          _collapsedCategories.remove(category);
+                        } else {
+                          _collapsedCategories.add(category);
+                        }
+                      });
+                    },
+                    icon: category == 'Mindset'
+                        ? FluentIcons.heart
+                        : FluentIcons.folder_open,
+                    showLayoutSwitcher: expanded && templates.isNotEmpty,
+                    isGridView: isGridView,
+                    onLayoutChanged: (grid) {
+                      setState(() {
+                        _categoryGridView[category] = grid;
+                      });
+                    },
+                    onRename: (nextName) =>
+                        widget.onCategoryRenamed(category, nextName),
+                    onDelete: () => _confirmDeleteCategory(
+                      context,
+                      category,
+                      templates.length,
                     ),
-                    if (expanded) ...[
-                      const SizedBox(height: 14),
-                      if (templates.isEmpty)
-                        _EmptyFolder(message: strings.text('No templates yet'))
-                      else if (isGridView)
-                        Wrap(
-                          spacing: 16,
-                          runSpacing: 16,
-                          children: templates
-                              .map(
-                                (template) => _TemplateCard(
-                                  template: template,
-                                  selected: template.title == widget.selectedTemplateTitle,
-                                  onTap: () => widget.onTemplateSelected(template),
-                                  updatedText: getMockUpdate(template.title),
-                                ),
-                              )
-                              .toList(),
-                        )
-                      else
-                        // List view representation
-                        Column(
-                          children: templates
-                              .map(
-                                (template) => _TemplateListRow(
-                                  template: template,
-                                  selected: template.title == widget.selectedTemplateTitle,
-                                  onTap: () => widget.onTemplateSelected(template),
-                                  updatedText: getMockUpdate(template.title),
-                                ),
-                              )
-                              .toList(),
-                        ),
-                    ],
+                  ),
+                  if (expanded) ...[
+                    const SizedBox(height: 14),
+                    if (templates.isEmpty)
+                      _EmptyFolder(message: strings.text('No templates yet'))
+                    else if (isGridView)
+                      Wrap(
+                        spacing: 16,
+                        runSpacing: 16,
+                        children: templates
+                            .map(
+                              (template) => _TemplateCard(
+                                template: template,
+                                selected:
+                                    template.title ==
+                                    widget.selectedTemplateTitle,
+                                onTap: () =>
+                                    widget.onTemplateSelected(template),
+                                updatedText: _updatedLabel(template.title),
+                              ),
+                            )
+                            .toList(),
+                      )
+                    else
+                      Column(
+                        children: templates
+                            .map(
+                              (template) => _TemplateListRow(
+                                template: template,
+                                selected:
+                                    template.title ==
+                                    widget.selectedTemplateTitle,
+                                onTap: () =>
+                                    widget.onTemplateSelected(template),
+                                updatedText: _updatedLabel(template.title),
+                              ),
+                            )
+                            .toList(),
+                      ),
                   ],
-                ),
-              );
-            },
-          ),
+                ],
+              ),
+            );
+          }),
 
           const SizedBox(height: 32),
 
-          // Bottom Sparkles Tip Banner
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
             decoration: BoxDecoration(
               color: AppColors.primarySoft.withValues(alpha: 0.6),
               borderRadius: BorderRadius.circular(8),
-              border: Border.all(color: AppColors.primary.withValues(alpha: 0.2)),
+              border: Border.all(
+                color: AppColors.primary.withValues(alpha: 0.2),
+              ),
             ),
             child: Row(
               mainAxisAlignment: MainAxisAlignment.center,
@@ -453,11 +453,7 @@ class _FolderSectionHeaderState extends State<_FolderSectionHeader> {
         },
         child: Row(
           children: [
-            Icon(
-              widget.icon,
-              size: 15,
-              color: AppColors.primary,
-            ),
+            Icon(widget.icon, size: 15, color: AppColors.primary),
             const SizedBox(width: 8),
             Text(
               widget.title,
@@ -485,36 +481,42 @@ class _FolderSectionHeaderState extends State<_FolderSectionHeader> {
             ),
             const Spacer(),
             if (widget.showLayoutSwitcher) ...[
-              // Grid View Toggle
               GestureDetector(
                 onTap: () => widget.onLayoutChanged?.call(true),
                 child: Container(
                   padding: const EdgeInsets.all(5),
                   decoration: BoxDecoration(
-                    color: widget.isGridView ? AppColors.primarySoft : Colors.transparent,
+                    color: widget.isGridView
+                        ? AppColors.primarySoft
+                        : Colors.transparent,
                     borderRadius: BorderRadius.circular(6),
                   ),
                   child: Icon(
                     FluentIcons.tiles,
                     size: 13,
-                    color: widget.isGridView ? AppColors.primary : AppColors.textSecondary,
+                    color: widget.isGridView
+                        ? AppColors.primary
+                        : AppColors.textSecondary,
                   ),
                 ),
               ),
               const SizedBox(width: 4),
-              // List View Toggle
               GestureDetector(
                 onTap: () => widget.onLayoutChanged?.call(false),
                 child: Container(
                   padding: const EdgeInsets.all(5),
                   decoration: BoxDecoration(
-                    color: !widget.isGridView ? AppColors.primarySoft : Colors.transparent,
+                    color: !widget.isGridView
+                        ? AppColors.primarySoft
+                        : Colors.transparent,
                     borderRadius: BorderRadius.circular(6),
                   ),
                   child: Icon(
                     FluentIcons.list,
                     size: 13,
-                    color: !widget.isGridView ? AppColors.primary : AppColors.textSecondary,
+                    color: !widget.isGridView
+                        ? AppColors.primary
+                        : AppColors.textSecondary,
                   ),
                 ),
               ),
@@ -602,7 +604,6 @@ class _TemplateCard extends StatelessWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // Icon + Title + Three Dots Row
             Row(
               children: [
                 Container(
@@ -613,11 +614,7 @@ class _TemplateCard extends StatelessWidget {
                     shape: BoxShape.circle,
                   ),
                   alignment: Alignment.center,
-                  child: Icon(
-                    template.icon,
-                    size: 13,
-                    color: template.accent,
-                  ),
+                  child: Icon(template.icon, size: 13, color: template.accent),
                 ),
                 const SizedBox(width: 10),
                 Expanded(
@@ -632,20 +629,14 @@ class _TemplateCard extends StatelessWidget {
                     ),
                   ),
                 ),
-                GestureDetector(
-                  onTap: () {
-                    // Quick Action button (mocked)
-                  },
-                  child: Icon(
-                    FluentIcons.more,
-                    size: 12,
-                    color: AppColors.textSecondary,
-                  ),
+                Icon(
+                  FluentIcons.more,
+                  size: 12,
+                  color: AppColors.textSecondary,
                 ),
               ],
             ),
             const SizedBox(height: 16),
-            // Custom Document Skeleton with Colored Bullet Dots
             Expanded(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
@@ -658,7 +649,6 @@ class _TemplateCard extends StatelessWidget {
                 ],
               ),
             ),
-            // Updated Date
             Text(
               updatedText,
               style: TextStyle(
@@ -703,6 +693,17 @@ class _TemplateCard extends StatelessWidget {
   }
 }
 
+String _updatedLabel(String title) {
+  return switch (title) {
+    'Pre-Market Thesis' => 'Updated 2 days ago',
+    'Trade Review' => 'Updated 1 day ago',
+    'Entry Model' => 'Updated 5 hours ago',
+    'Emotional Mapping Journal' => 'Updated 3 days ago',
+    'Pre-Market Mental Prep' => 'Updated 4 days ago',
+    _ => 'Updated recently',
+  };
+}
+
 class _TemplateListRow extends StatelessWidget {
   final NotebookTemplate template;
   final bool selected;
@@ -724,7 +725,9 @@ class _TemplateListRow extends StatelessWidget {
         margin: const EdgeInsets.only(bottom: 8),
         padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
         decoration: BoxDecoration(
-          color: selected ? AppColors.primarySoft.withValues(alpha: 0.5) : AppColors.surface,
+          color: selected
+              ? AppColors.primarySoft.withValues(alpha: 0.5)
+              : AppColors.surface,
           borderRadius: BorderRadius.circular(8),
           border: Border.all(
             color: selected ? AppColors.primary : AppColors.border,
@@ -741,11 +744,7 @@ class _TemplateListRow extends StatelessWidget {
                 shape: BoxShape.circle,
               ),
               alignment: Alignment.center,
-              child: Icon(
-                template.icon,
-                size: 11,
-                color: template.accent,
-              ),
+              child: Icon(template.icon, size: 11, color: template.accent),
             ),
             const SizedBox(width: 12),
             Expanded(
@@ -760,17 +759,10 @@ class _TemplateListRow extends StatelessWidget {
             ),
             Text(
               updatedText,
-              style: TextStyle(
-                fontSize: 11,
-                color: AppColors.textSecondary,
-              ),
+              style: TextStyle(fontSize: 11, color: AppColors.textSecondary),
             ),
             const SizedBox(width: 12),
-            Icon(
-              FluentIcons.more,
-              size: 12,
-              color: AppColors.textSecondary,
-            ),
+            Icon(FluentIcons.more, size: 12, color: AppColors.textSecondary),
           ],
         ),
       ),

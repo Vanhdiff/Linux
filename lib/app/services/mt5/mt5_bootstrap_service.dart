@@ -25,6 +25,28 @@ class Mt5BootstrapService {
     return json;
   }
 
+  Future<void> syncActiveAccount() async {
+    await _backend.ensureRunning();
+    final response = await _apiClient.getJson('/api/accounts');
+    final accounts = (response as List)
+        .whereType<Map>()
+        .map((item) => Map<String, dynamic>.from(item))
+        .toList();
+    if (accounts.isEmpty) return;
+    final active =
+        accounts.cast<Map<String, dynamic>?>().firstWhere(
+          (item) => item?['is_active'] as bool? ?? false,
+          orElse: () => accounts.first,
+        ) ??
+        accounts.first;
+    final id = active['id'];
+    if (id is! num) return;
+    ActiveAccountSession.useMt5Account(
+      id: id.toInt(),
+      login: active['login'] as String?,
+    );
+  }
+
   void close({bool shutdownBackend = false}) {
     _apiClient.close();
     if (shutdownBackend) {

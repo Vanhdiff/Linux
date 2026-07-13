@@ -53,6 +53,7 @@ class _MainShellState extends State<MainShell> with WidgetsBindingObserver {
     WidgetsBinding.instance.addObserver(this);
     _isBootstrapping = false;
     _connectionMessage = 'Sync MT5 from Settings';
+    unawaited(_syncActiveAccountSession());
     if (OnlineLicenseConfig.enabled) {
       unawaited(_refreshOnlineLicenseState(isInitialCheck: true));
       _licenseMonitorTimer = Timer.periodic(
@@ -93,6 +94,21 @@ class _MainShellState extends State<MainShell> with WidgetsBindingObserver {
 
   void _toggleSidebarCollapsed() {
     setState(() => sidebarCollapsed = !sidebarCollapsed);
+  }
+
+  Future<void> _syncActiveAccountSession() async {
+    try {
+      await _mt5BootstrapService.syncActiveAccount();
+      if (!mounted) return;
+      setState(() {
+        _connectionMessage =
+            ActiveAccountSession.activeAccountLogin == null
+            ? _connectionMessage
+            : 'MT5 ${ActiveAccountSession.activeAccountLogin}';
+      });
+    } catch (_) {
+      // Leave the default session in place until backend/account info is available.
+    }
   }
 
   Future<void> _refreshOnlineLicenseState({

@@ -39,6 +39,9 @@ Source: "{#BackendRoot}\run.py"; DestDir: "{app}\backend"; Flags: ignoreversion
 Source: "{#BackendRoot}\app\*"; DestDir: "{app}\backend\app"; Flags: ignoreversion recursesubdirs createallsubdirs; Excludes: "__pycache__\*,*.pyc"
 Source: "{#BackendRoot}\.deps\*"; DestDir: "{app}\backend\.deps"; Flags: ignoreversion recursesubdirs createallsubdirs; Excludes: "__pycache__\*,*.pyc"
 Source: "{#BackendRoot}\data\.gitkeep"; DestDir: "{app}\backend\data"; Flags: ignoreversion
+Source: "mt5\Experts\TradingDeskGuardEA.mq5"; DestDir: "{app}\mt5\Experts"; Flags: ignoreversion
+Source: "mt5\README.md"; DestDir: "{app}\mt5"; Flags: ignoreversion
+Source: "mt5\REAL_DEMO_VALIDATION_CHECKLIST.md"; DestDir: "{app}\mt5"; Flags: ignoreversion
 Source: "{#PythonSourceRoot}\python.exe"; DestDir: "{app}\python"; Flags: ignoreversion
 Source: "{#PythonSourceRoot}\pythonw.exe"; DestDir: "{app}\python"; Flags: ignoreversion
 Source: "{#PythonSourceRoot}\python3.dll"; DestDir: "{app}\python"; Flags: ignoreversion
@@ -46,7 +49,7 @@ Source: "{#PythonSourceRoot}\python311.dll"; DestDir: "{app}\python"; Flags: ign
 Source: "{#PythonSourceRoot}\vcruntime140.dll"; DestDir: "{app}\python"; Flags: ignoreversion
 Source: "{#PythonSourceRoot}\vcruntime140_1.dll"; DestDir: "{app}\python"; Flags: ignoreversion
 Source: "{#PythonSourceRoot}\DLLs\*"; DestDir: "{app}\python\DLLs"; Flags: ignoreversion recursesubdirs createallsubdirs
-Source: "{#PythonSourceRoot}\Lib\*"; DestDir: "{app}\python\Lib"; Flags: ignoreversion recursesubdirs createallsubdirs; Excludes: "__pycache__\*,*.pyc,test\*,tests\*,idlelib\*,turtledemo\*,tkinter\test\*,unittest\test\*,ensurepip\*,site-packages\pip\*,site-packages\pip-23.2.1.dist-info\*,site-packages\setuptools\*,site-packages\setuptools-65.5.0.dist-info\*,site-packages\pkg_resources\*,site-packages\_distutils_hack\*"
+Source: "{#PythonSourceRoot}\Lib\*"; DestDir: "{app}\python\Lib"; Flags: ignoreversion recursesubdirs createallsubdirs; Excludes: "__pycache__\*,*.pyc,test\*,tests\*,idlelib\*,turtledemo\*,tkinter\test\*,unittest\test\*,ensurepip\*,site-packages\pip\*,site-packages\pip-23.2.1.dist-info\*,site-packages\setuptools\*,site-packages\setuptools-65.5.0.dist-info\*,site-packages\pkg_resources\*,site-packages\_distutils_hack\*,site-packages\distutils-precedence.pth"
 Source: "installer\vc_redist.x64.exe"; DestDir: "{tmp}"; Flags: deleteafterinstall
 
 [Icons]

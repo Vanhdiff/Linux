@@ -1,6 +1,10 @@
 from datetime import datetime, timedelta, timezone
+from pathlib import Path
+import sys
 
-import pytest
+ROOT = Path(__file__).resolve().parents[2]
+sys.path[:0] = [str(ROOT / "backend" / ".deps"), str(ROOT / "backend")]
+
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 from sqlalchemy.pool import StaticPool
@@ -18,8 +22,7 @@ from app.models import BlockState as DBBlockState
 from app.models import TradingAccount
 
 
-@pytest.fixture()
-def db_session():
+def _make_db_session():
     engine = create_engine(
         "sqlite+pysqlite:///:memory:",
         connect_args={"check_same_thread": False},
@@ -27,13 +30,7 @@ def db_session():
     )
     Base.metadata.create_all(bind=engine)
     SessionLocal = sessionmaker(bind=engine, autoflush=False, autocommit=False)
-    session = SessionLocal()
-    try:
-        yield session
-    finally:
-        session.close()
-        Base.metadata.drop_all(bind=engine)
-        engine.dispose()
+    return engine, SessionLocal()
 
 
 def test_block_state_normalizes_db_values_and_lifecycle_state():
@@ -71,7 +68,7 @@ def test_block_state_machine_transitions_and_rejects_invalid_transition():
     )
 
     assert machine.determine_state([], None) is BlockStateEnum.NORMAL
-    assert machine.determine_state(["risk_too_high"], None) is BlockStateEnum.WARNING
+    assert machine.determine_state(["risk_too_high"], None) is BlockStateEnum.TEMPORARY_BLOCK
     assert (
         machine.determine_state(["max_daily_loss_reached"], None)
         is BlockStateEnum.FULL_DAY_BLOCK
@@ -83,11 +80,29 @@ def test_block_state_machine_transitions_and_rejects_invalid_transition():
         BlockStateEnum.FULL_DAY_BLOCK,
     )
 
-    with pytest.raises(ValueError):
+    try:
         machine.transition(BlockStateEnum.FULL_DAY_BLOCK, BlockStateEnum.WARNING)
+    except ValueError:
+        pass
+    else:
+        raise AssertionError("Expected invalid block state transition to fail")
 
 
-def test_block_repository_cleans_expired_blocks_and_restores_active_blocks(db_session):
+def test_block_repository_cleans_expired_blocks_and_restores_active_blocks():
+    engine, db_session = _make_db_session()
+    try:
+        _assert_block_repository_cleans_expired_blocks_and_restores_active_blocks(
+            db_session
+        )
+    finally:
+        db_session.close()
+        Base.metadata.drop_all(bind=engine)
+        engine.dispose()
+
+
+def _assert_block_repository_cleans_expired_blocks_and_restores_active_blocks(
+    db_session,
+):
     account = TradingAccount(login="10001", name="Test account")
     db_session.add(account)
     db_session.commit()
@@ -125,3 +140,9 @@ def test_block_repository_cleans_expired_blocks_and_restores_active_blocks(db_se
     assert active[0].block_type is BlockType.TEMPORARY
     assert repo.count_active_blocks() == 1
 
+
+if __name__ == "__main__":
+    test_block_state_normalizes_db_values_and_lifecycle_state()
+    test_block_state_machine_transitions_and_rejects_invalid_transition()
+    test_block_repository_cleans_expired_blocks_and_restores_active_blocks()
+    print("test_block_trade_phase1a: PASS")

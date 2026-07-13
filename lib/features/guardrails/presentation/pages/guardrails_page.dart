@@ -1,13 +1,25 @@
+import 'dart:async';
 import 'dart:convert';
 
 import 'package:fluent_ui/fluent_ui.dart';
-
+import 'package:flutter/services.dart';
 import '../../../../app/i18n/app_localization.dart';
-import '../../../../app/i18n/app_strings.dart';
+
+import '../../../../app/services/api/api_config.dart';
 import '../../../../app/services/api/api_exception.dart';
 import '../../../../app/state/active_account_session.dart';
 import '../../../../app/theme/app_colors.dart';
+import '../../guardrails_defaults.dart';
+import '../../guardrails_form_support.dart';
 import '../../data/datasources/guardrails_remote_datasource.dart';
+import '../widgets/guardrails_demo_harness_card.dart';
+import '../widgets/guardrails_full_protection_flow_card.dart';
+import '../widgets/guardrails_form_controls.dart';
+import '../widgets/guardrails_mt5_setup_card.dart';
+import '../widgets/guardrails_rules_panel.dart';
+import '../widgets/guardrails_status_sections.dart';
+import '../widgets/guardrails_surface_widgets.dart';
+import '../widgets/guardrails_time_zone_badge.dart';
 
 class GuardrailsPage extends StatefulWidget {
   const GuardrailsPage({super.key});
@@ -19,32 +31,62 @@ class GuardrailsPage extends StatefulWidget {
 class _GuardrailsPageState extends State<GuardrailsPage> {
   int get _accountId => ActiveAccountSession.accountId;
 
+  static final _defaults = GuardrailsFormValues.defaults();
   final _remote = GuardrailsRemoteDataSource();
-  final _maxTradesController = TextEditingController(text: '5');
-  final _maxDailyLossController = TextEditingController(text: '3000');
-  final _maxDailyProfitController = TextEditingController(text: '5000');
-  final _riskController = TextEditingController(text: '0.5');
-  final _windowStartController = TextEditingController(text: '07:00');
-  final _windowEndController = TextEditingController(text: '10:00');
-  final _newsMinutesController = TextEditingController(text: '30');
+  final _maxTradesController = TextEditingController(
+    text: _defaults.maxTradesPerDay,
+  );
+  final _maxDailyLossController = TextEditingController(
+    text: _defaults.maxDailyLoss,
+  );
+  final _maxDailyProfitController = TextEditingController(
+    text: _defaults.maxDailyProfit,
+  );
+  final _riskController = TextEditingController(
+    text: _defaults.fixedRiskPercent,
+  );
+  final _windowStartController = TextEditingController(
+    text: _defaults.tradingWindowStart,
+  );
+  final _windowEndController = TextEditingController(
+    text: _defaults.tradingWindowEnd,
+  );
+  final _newsMinutesController = TextEditingController(
+    text: _defaults.newsWindowMinutes,
+  );
+  Timer? _mt5SetupPollTimer;
 
   Map<String, dynamic>? _status;
   Map<String, dynamic>? _mt5BlockerStatus;
-  String _newsMode = 'Before and After';
+  Map<String, dynamic>? _mt5ProtectionStatus;
+  Map<String, dynamic>? _mt5EaInstallStatus;
+  Map<String, dynamic>? _mt5EaSetupReport;
+  Map<String, dynamic>? _mt5DemoHarnessReport;
+  String _newsMode = _defaults.newsBlockMode;
   bool _tradeBlockingEnabled = false;
   bool _blockHighImpactNews = true;
   bool _loading = true;
   bool _saving = false;
+  bool _repairingEa = false;
+  bool _installingEa = false;
+  bool _compilingEa = false;
+  bool _refreshingMt5Setup = false;
+  bool _loadingDemoHarness = false;
+  bool _showMt5SetupDetails = false;
+  bool _showDemoHarnessDetails = false;
+  bool _mt5ReadyNoticeShown = false;
   String? _notice;
 
   @override
   void initState() {
     super.initState();
+    _startMt5SetupPolling();
     _loadStatus();
   }
 
   @override
   void dispose() {
+    _mt5SetupPollTimer?.cancel();
     _maxTradesController.dispose();
     _maxDailyLossController.dispose();
     _maxDailyProfitController.dispose();
@@ -52,6 +94,7 @@ class _GuardrailsPageState extends State<GuardrailsPage> {
     _windowStartController.dispose();
     _windowEndController.dispose();
     _newsMinutesController.dispose();
+    _remote.close();
     super.dispose();
   }
 
@@ -76,13 +119,16 @@ class _GuardrailsPageState extends State<GuardrailsPage> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  _Header(
+                  GuardrailsHeader(
                     status: _status,
                     loading: _loading,
                     onRefresh: _loadStatus,
                   ),
                   const SizedBox(height: 14),
-                  _StatusStrip(status: _status),
+                  GuardrailsStatusStrip(
+                    status: _status,
+                    protectionStatus: _mt5ProtectionStatus,
+                  ),
                   const SizedBox(height: 14),
                   _BlockBanner(status: _status),
                   const SizedBox(height: 14),
@@ -93,9 +139,11 @@ class _GuardrailsPageState extends State<GuardrailsPage> {
                       const SizedBox(width: 16),
                       Expanded(
                         flex: 9,
-                        child: _RulesPanel(
+                        child: GuardrailsRulesPanel(
+                          accountId: _accountId,
                           status: _status,
                           mt5BlockerStatus: _mt5BlockerStatus,
+                          mt5ProtectionStatus: _mt5ProtectionStatus,
                         ),
                       ),
                     ],
@@ -113,14 +161,27 @@ class _GuardrailsPageState extends State<GuardrailsPage> {
     final strings = AppLocalization.of(context);
     final hardLocked = _guardrailsHardLocked;
     final lockMessage = _guardrailLockMessage;
-    return _Panel(
+    return GuardrailsPanel(
       title: strings.text('Trade blocking rules'),
       subtitle: strings.text(
         'Guardrails can block app/EA trade execution automatically once enabled.',
       ),
       child: Column(
         children: [
-          _SettingRow(
+          GuardrailsFullProtectionFlowCard(
+            guardrailStatus: _status,
+            installerStatus: _mt5EaInstallStatus,
+            protectionStatus: _mt5ProtectionStatus,
+            demoReport: _mt5DemoHarnessReport,
+            setupState:
+                _mt5EaSetupReport?['one_click_setup']
+                    as Map<String, dynamic>?,
+            busy: _repairingEa || _installingEa || _compilingEa,
+            onRepair: _repairEa,
+            onRefresh: _loadStatus,
+          ),
+          const SizedBox(height: 12),
+          GuardrailsSettingRow(
             icon: FluentIcons.lock,
             title: strings.text('Enable trade blocking'),
             description: strings.text(
@@ -133,55 +194,55 @@ class _GuardrailsPageState extends State<GuardrailsPage> {
                   : (value) => setState(() => _tradeBlockingEnabled = value),
             ),
           ),
-          _SettingRow(
+          GuardrailsSettingRow(
             icon: FluentIcons.number_field,
             title: strings.text('Max trades per day'),
             description: strings.text(
               'Stop overtrading by limiting completed trades',
             ),
-            control: _Field(
+            control: GuardrailsTextField(
               controller: _maxTradesController,
               suffix: 'trades',
               enabled: !hardLocked,
             ),
           ),
-          _SettingRow(
+          GuardrailsSettingRow(
             icon: FluentIcons.money,
             title: strings.text('Max daily loss'),
             description: strings.text(
               'Uses realized P&L from normalized trades',
             ),
-            control: _Field(
+            control: GuardrailsTextField(
               controller: _maxDailyLossController,
               prefix: r'$',
               enabled: !hardLocked,
             ),
           ),
-          _SettingRow(
+          GuardrailsSettingRow(
             icon: FluentIcons.savings,
             title: strings.text('Max daily profit'),
             description: strings.text(
               'Locks in discipline once the target is reached',
             ),
-            control: _Field(
+            control: GuardrailsTextField(
               controller: _maxDailyProfitController,
               prefix: r'$',
               enabled: !hardLocked,
             ),
           ),
-          _SettingRow(
+          GuardrailsSettingRow(
             icon: FluentIcons.speed_high,
             title: strings.text('Fixed risk per trade'),
             description: strings.text(
               'Stored for position sizing and risk warnings',
             ),
-            control: _Field(
+            control: GuardrailsTextField(
               controller: _riskController,
               suffix: '%',
               enabled: !hardLocked,
             ),
           ),
-          _SettingRow(
+          GuardrailsSettingRow(
             icon: FluentIcons.clock,
             title: strings.text('Trading window'),
             description: strings.text(
@@ -192,13 +253,13 @@ class _GuardrailsPageState extends State<GuardrailsPage> {
               runSpacing: 8,
               crossAxisAlignment: WrapCrossAlignment.center,
               children: [
-                const _TimeZoneBadge(),
-                _Field(
+                const GuardrailsTimeZoneBadge(),
+                GuardrailsTextField(
                   controller: _windowStartController,
                   width: 64,
                   enabled: !hardLocked,
                 ),
-                _Field(
+                GuardrailsTextField(
                   controller: _windowEndController,
                   width: 64,
                   enabled: !hardLocked,
@@ -206,7 +267,7 @@ class _GuardrailsPageState extends State<GuardrailsPage> {
               ],
             ),
           ),
-          _SettingRow(
+          GuardrailsSettingRow(
             icon: FluentIcons.news,
             title: strings.text('High-impact news block'),
             description: strings.text(
@@ -223,19 +284,15 @@ class _GuardrailsPageState extends State<GuardrailsPage> {
                       ? null
                       : (value) => setState(() => _blockHighImpactNews = value),
                 ),
-                _Select(
+                GuardrailsSelect(
                   value: _newsMode,
-                  values: const [
-                    'Before and After',
-                    'Before only',
-                    'After only',
-                  ],
+                  values: GuardrailsDefaults.newsBlockModes,
                   width: 150,
                   onChanged: hardLocked
                       ? null
                       : (value) => setState(() => _newsMode = value),
                 ),
-                _Field(
+                GuardrailsTextField(
                   controller: _newsMinutesController,
                   width: 56,
                   suffix: 'm',
@@ -246,21 +303,21 @@ class _GuardrailsPageState extends State<GuardrailsPage> {
           ),
           if (lockMessage != null) ...[
             const SizedBox(height: 12),
-            _Notice(text: lockMessage),
+            GuardrailsNotice(text: lockMessage),
           ],
           if (_notice != null) ...[
             const SizedBox(height: 12),
-            _Notice(text: _notice!),
+            GuardrailsNotice(text: _notice!),
           ],
           const SizedBox(height: 12),
           Row(
             children: [
-              _OutlineAction(
+              GuardrailsOutlineAction(
                 label: strings.text('Reset defaults'),
                 onTap: hardLocked ? null : _resetDefaults,
               ),
               const Spacer(),
-              _PrimaryAction(
+              GuardrailsPrimaryAction(
                 label: hardLocked
                     ? strings.text('Locked')
                     : (_saving
@@ -270,9 +327,138 @@ class _GuardrailsPageState extends State<GuardrailsPage> {
               ),
             ],
           ),
+          const SizedBox(height: 14),
+          GuardrailsEaInstallCard(
+            status: _mt5EaInstallStatus,
+            setupState:
+                _mt5EaSetupReport?['one_click_setup']
+                    as Map<String, dynamic>?,
+            protectionStatus: _mt5ProtectionStatus,
+            showDetails: _showMt5SetupDetails,
+            repairing: _repairingEa,
+            installing: _installingEa,
+            compiling: _compilingEa,
+            onRepair: _repairEa,
+            onInstall: _installEa,
+            onCompile: _compileEa,
+            onOpenExperts: _openExpertsFolder,
+            onCopyBackendUrl: _copyMt5BackendUrl,
+            onCopyReport: _copyMt5SetupReport,
+            onRefresh: _loadStatus,
+            onToggleDetails: () {
+              setState(() => _showMt5SetupDetails = !_showMt5SetupDetails);
+            },
+          ),
+          const SizedBox(height: 12),
+          GuardrailsDemoHarnessCard(
+            report: _mt5DemoHarnessReport,
+            loading: _loadingDemoHarness,
+            showDetails: _showDemoHarnessDetails,
+            onRefresh: _refreshDemoHarnessReport,
+            onCopyReport: _copyMt5DemoHarnessReport,
+            onToggleDetails: () {
+              setState(
+                () => _showDemoHarnessDetails = !_showDemoHarnessDetails,
+              );
+            },
+          ),
         ],
       ),
     );
+  }
+
+  bool get _mt5SetupReady {
+    final installer = _mt5EaInstallStatus;
+    final protection = _mt5ProtectionStatus;
+    final ea = protection?['ea'] as Map<String, dynamic>?;
+    return ((installer?['terminal_count'] as num?)?.toInt() ?? 0) > 0 &&
+        ((installer?['installed_count'] as num?)?.toInt() ?? 0) > 0 &&
+        ((installer?['compiled_count'] as num?)?.toInt() ?? 0) > 0 &&
+        (installer?['source_exists'] as bool? ?? false) &&
+        (ea?['connected'] as bool? ?? false) &&
+        !((ea?['stale'] as bool?) ?? false);
+  }
+
+  bool get _demoHarnessComplete {
+    final completion =
+        _mt5DemoHarnessReport?['completion'] as Map<String, dynamic>?;
+    return completion?['all_required_timestamp_fields_present'] as bool? ??
+        false;
+  }
+
+  bool get _fullProtectionVerified =>
+      _mt5SetupReady &&
+      (_mt5ProtectionStatus?['level']?.toString().toUpperCase() == 'FULL') &&
+      _demoHarnessComplete;
+
+  bool get _shouldPollMt5Setup =>
+      !_loading &&
+      !_repairingEa &&
+      !_installingEa &&
+      !_compilingEa &&
+      !_refreshingMt5Setup &&
+      !_fullProtectionVerified;
+
+  void _startMt5SetupPolling() {
+    _mt5SetupPollTimer?.cancel();
+    _mt5SetupPollTimer = Timer.periodic(const Duration(seconds: 5), (_) {
+      if (!_shouldPollMt5Setup) return;
+      _refreshMt5SetupStatus();
+    });
+  }
+
+  Future<void> _refreshMt5SetupStatus() async {
+    if (_refreshingMt5Setup || !mounted) return;
+    _refreshingMt5Setup = true;
+    try {
+      final setupReport = await _remote.fetchMt5EaSetupReport(
+        accountId: _accountId,
+      );
+      Map<String, dynamic>? demoHarnessReport;
+      Map<String, dynamic>? blockerStatus;
+      try {
+        blockerStatus = await _remote.fetchMt5TradeBlockerStatus();
+      } catch (_) {
+        blockerStatus = _mt5BlockerStatus;
+      }
+      try {
+        demoHarnessReport = await _remote.fetchMt5DemoHarnessReport(
+          accountId: _accountId,
+        );
+      } catch (_) {
+        demoHarnessReport = _mt5DemoHarnessReport;
+      }
+      if (!mounted) return;
+      final wasReady = _mt5SetupReady;
+      final nextInstaller = setupReport['installer'] as Map<String, dynamic>?;
+      final nextProtection = setupReport['protection'] as Map<String, dynamic>?;
+      final nextEa = nextProtection?['ea'] as Map<String, dynamic>?;
+      final nowReady =
+          ((nextInstaller?['terminal_count'] as num?)?.toInt() ?? 0) > 0 &&
+          ((nextInstaller?['installed_count'] as num?)?.toInt() ?? 0) > 0 &&
+          ((nextInstaller?['compiled_count'] as num?)?.toInt() ?? 0) > 0 &&
+          (nextInstaller?['source_exists'] as bool? ?? false) &&
+          (nextEa?['connected'] as bool? ?? false) &&
+          !((nextEa?['stale'] as bool?) ?? false);
+      setState(() {
+        _mt5EaInstallStatus = nextInstaller;
+        _mt5EaSetupReport = setupReport;
+        _mt5ProtectionStatus = nextProtection;
+        _mt5BlockerStatus = blockerStatus;
+        _mt5DemoHarnessReport = demoHarnessReport;
+        if (nowReady && !wasReady && !_mt5ReadyNoticeShown) {
+          _notice =
+              'EA heartbeat detected. MT5 protection is now connected and ready.';
+          _mt5ReadyNoticeShown = true;
+        } else if (!nowReady) {
+          _mt5ReadyNoticeShown = false;
+        }
+      });
+    } catch (_) {
+      // Keep silent during background polling to avoid noisy notices.
+    } finally {
+      _refreshingMt5Setup = false;
+    }
   }
 
   Future<void> _loadStatus() async {
@@ -284,15 +470,47 @@ class _GuardrailsPageState extends State<GuardrailsPage> {
     try {
       final status = await _remote.fetchStatus(accountId: _accountId);
       Map<String, dynamic>? blockerStatus;
+      Map<String, dynamic>? protectionStatus;
+      Map<String, dynamic>? eaInstallStatus;
+      Map<String, dynamic>? demoHarnessReport;
       try {
         blockerStatus = await _remote.fetchMt5TradeBlockerStatus();
       } catch (_) {
         blockerStatus = null;
       }
+      try {
+        final setupReport = await _remote.fetchMt5EaSetupReport(
+          accountId: _accountId,
+        );
+        protectionStatus = setupReport['protection'] as Map<String, dynamic>?;
+        eaInstallStatus = setupReport['installer'] as Map<String, dynamic>?;
+        _mt5EaSetupReport = setupReport;
+        demoHarnessReport = await _remote.fetchMt5DemoHarnessReport(
+          accountId: _accountId,
+        );
+      } catch (_) {
+        try {
+          protectionStatus = await _remote.fetchMt5ProtectionStatus(
+            accountId: _accountId,
+          );
+        } catch (_) {
+          protectionStatus = null;
+        }
+        try {
+          eaInstallStatus = await _remote.fetchMt5EaInstallStatus();
+        } catch (_) {
+          eaInstallStatus = null;
+        }
+        _mt5EaSetupReport = null;
+      }
       if (!mounted) return;
       setState(() {
         _status = status;
         _mt5BlockerStatus = blockerStatus;
+        _mt5ProtectionStatus = protectionStatus;
+        _mt5EaInstallStatus = eaInstallStatus;
+        _mt5DemoHarnessReport = demoHarnessReport;
+        _mt5ReadyNoticeShown = _mt5SetupReady;
         _applySettings(status['settings'] as Map<String, dynamic>?);
         _loading = false;
       });
@@ -300,23 +518,330 @@ class _GuardrailsPageState extends State<GuardrailsPage> {
       if (!mounted) return;
       setState(() {
         _loading = false;
-        _notice = 'Backend offline - editing recommended local defaults.';
+        _notice =
+            'Trading service is starting - recommended local defaults are available while data loads.';
+      });
+    }
+  }
+
+  Future<void> _openExpertsFolder() async {
+    try {
+      await _remote.openMt5ExpertsFolder();
+      if (!mounted) return;
+      setState(() => _notice = 'Opened MT5 Experts folder.');
+    } catch (error) {
+      if (!mounted) return;
+      setState(() {
+        _notice =
+            'Could not open Experts folder: ${error is ApiException ? error.message : error}';
+      });
+    }
+  }
+
+  Future<void> _installEa() async {
+    setState(() {
+      _installingEa = true;
+      _notice = null;
+    });
+
+    try {
+      final installResult = await _remote.installMt5Ea();
+      final setupReport = await _remote.fetchMt5EaSetupReport(
+        accountId: _accountId,
+      );
+      Map<String, dynamic>? demoHarnessReport;
+      try {
+        demoHarnessReport = await _remote.fetchMt5DemoHarnessReport(
+          accountId: _accountId,
+        );
+      } catch (_) {
+        demoHarnessReport = _mt5DemoHarnessReport;
+      }
+      if (!mounted) return;
+      final compiled = installResult['compiled'] as bool? ?? false;
+      final verified = installResult['verified'] as bool? ?? false;
+      final issue = _extractEaActionIssue(installResult);
+      setState(() {
+        _mt5EaSetupReport = setupReport;
+        _mt5EaInstallStatus = setupReport['installer'] as Map<String, dynamic>?;
+        _mt5ProtectionStatus =
+            setupReport['protection'] as Map<String, dynamic>?;
+        _mt5DemoHarnessReport = demoHarnessReport;
+        _installingEa = false;
+        _notice = compiled && verified
+            ? 'EA installed, compiled, and verified. Attach TradingDeskGuardEA to one chart, then enable Algo Trading.'
+            : (issue == null
+                  ? 'EA copied, but compile/verify did not complete. Open Experts folder or rerun Install EA.'
+                  : 'EA copied, but compile/verify did not complete: $issue');
+      });
+    } catch (error) {
+      if (!mounted) return;
+      setState(() {
+        _installingEa = false;
+        _notice =
+            'Could not install EA: ${error is ApiException ? error.message : error}';
+      });
+    }
+  }
+
+  Future<void> _refreshDemoHarnessReport() async {
+    setState(() {
+      _loadingDemoHarness = true;
+      _notice = null;
+    });
+
+    try {
+      final report = await _remote.fetchMt5DemoHarnessReport(
+        accountId: _accountId,
+      );
+      if (!mounted) return;
+      setState(() {
+        _mt5DemoHarnessReport = report;
+        _loadingDemoHarness = false;
+      });
+    } catch (error) {
+      if (!mounted) return;
+      setState(() {
+        _loadingDemoHarness = false;
+        _notice =
+            'Could not load demo validation report: ${error is ApiException ? error.message : error}';
+      });
+    }
+  }
+
+  Future<void> _repairEa() async {
+    setState(() {
+      _repairingEa = true;
+      _notice = null;
+    });
+
+    try {
+      final repairResult = await _remote.repairMt5Ea(
+        accountId: _accountId,
+        backendBaseUrl: ApiConfig.baseUrl,
+      );
+      final setupReport = await _remote.fetchMt5EaSetupReport(
+        accountId: _accountId,
+      );
+      Map<String, dynamic>? demoHarnessReport;
+      try {
+        demoHarnessReport = await _remote.fetchMt5DemoHarnessReport(
+          accountId: _accountId,
+        );
+      } catch (_) {
+        demoHarnessReport = _mt5DemoHarnessReport;
+      }
+      if (!mounted) return;
+      final repaired = repairResult['repaired'] as bool? ?? false;
+      final issue = _extractEaActionIssue(repairResult);
+      final setupState =
+          repairResult['setup_state'] as Map<String, dynamic>? ??
+          setupReport['one_click_setup'] as Map<String, dynamic>?;
+      final nextAction = setupState?['detail']?.toString();
+      setState(() {
+        _mt5EaSetupReport = setupReport;
+        _mt5EaInstallStatus = setupReport['installer'] as Map<String, dynamic>?;
+        _mt5ProtectionStatus =
+            setupReport['protection'] as Map<String, dynamic>?;
+        _mt5DemoHarnessReport = demoHarnessReport;
+        _repairingEa = false;
+        _notice = repaired
+            ? 'One-click setup completed on the backend. If heartbeat is not live yet, attach the EA to one chart and enable Algo Trading in MT5.'
+            : (issue != null
+                  ? 'One-click setup needs attention: $issue'
+                  : 'One-click setup needs one more step: ${nextAction ?? 'review MT5 setup report.'}');
+      });
+    } catch (error) {
+      if (!mounted) return;
+      setState(() {
+        _repairingEa = false;
+        _notice =
+            'Could not repair EA setup: ${error is ApiException ? error.message : error}';
+      });
+    }
+  }
+
+  Future<void> _compileEa() async {
+    setState(() {
+      _compilingEa = true;
+      _notice = null;
+    });
+
+    try {
+      final compileResult = await _remote.compileMt5Ea();
+      final setupReport = await _remote.fetchMt5EaSetupReport(
+        accountId: _accountId,
+      );
+      Map<String, dynamic>? demoHarnessReport;
+      try {
+        demoHarnessReport = await _remote.fetchMt5DemoHarnessReport(
+          accountId: _accountId,
+        );
+      } catch (_) {
+        demoHarnessReport = _mt5DemoHarnessReport;
+      }
+      if (!mounted) return;
+      final compiled = compileResult['compiled'] as bool? ?? false;
+      final verified = compileResult['verified'] as bool? ?? false;
+      final issue = _extractEaActionIssue(compileResult);
+      setState(() {
+        _mt5EaInstallStatus = setupReport['installer'] as Map<String, dynamic>?;
+        _mt5EaSetupReport = setupReport;
+        _mt5ProtectionStatus =
+            setupReport['protection'] as Map<String, dynamic>?;
+        _mt5DemoHarnessReport = demoHarnessReport;
+        _compilingEa = false;
+        _notice = compiled && verified
+            ? 'EA compiled and verified. Attach TradingDeskGuardEA to one chart, then enable Algo Trading.'
+            : (issue == null
+                  ? 'Compile did not complete cleanly. Copy Report to inspect MetaEditor/log diagnostics.'
+                  : 'Compile did not complete cleanly: $issue');
+      });
+    } catch (error) {
+      if (!mounted) return;
+      setState(() {
+        _compilingEa = false;
+        _notice =
+            'Could not compile EA: ${error is ApiException ? error.message : error}';
+      });
+    }
+  }
+
+  String? _extractEaActionIssue(Map<String, dynamic> result) {
+    final directError = result['error']?.toString();
+    if (directError != null && directError.trim().isNotEmpty) {
+      return directError.trim();
+    }
+
+    final errors = result['errors'];
+    if (errors is List && errors.isNotEmpty) {
+      final first = errors.first?.toString();
+      if (first != null && first.trim().isNotEmpty) {
+        return first.trim();
+      }
+    }
+
+    final targetIssue = _extractIssueFromTargetList(result['targets']);
+    if (targetIssue != null) return targetIssue;
+
+    final compileResults = result['compile_results'];
+    if (compileResults is List) {
+      for (final entry in compileResults) {
+        if (entry is Map<String, dynamic>) {
+          final nestedIssue = _extractEaActionIssue(entry);
+          if (nestedIssue != null) return nestedIssue;
+        } else if (entry is Map) {
+          final nestedIssue = _extractEaActionIssue(
+            Map<String, dynamic>.from(entry),
+          );
+          if (nestedIssue != null) return nestedIssue;
+        }
+      }
+    }
+
+    final installResult = result['install'];
+    if (installResult is Map<String, dynamic>) {
+      final nestedIssue = _extractEaActionIssue(installResult);
+      if (nestedIssue != null) return nestedIssue;
+    } else if (installResult is Map) {
+      final nestedIssue = _extractEaActionIssue(
+        Map<String, dynamic>.from(installResult),
+      );
+      if (nestedIssue != null) return nestedIssue;
+    }
+
+    return null;
+  }
+
+  String? _extractIssueFromTargetList(Object? targets) {
+    if (targets is! List) return null;
+    for (final target in targets) {
+      final map = switch (target) {
+        Map<String, dynamic>() => target,
+        Map() => Map<String, dynamic>.from(target),
+        _ => null,
+      };
+      if (map == null) continue;
+      final targetError = map['error']?.toString();
+      if (targetError != null && targetError.trim().isNotEmpty) {
+        return targetError.trim();
+      }
+      final tail = map['compile_log_tail'];
+      if (tail is List && tail.isNotEmpty) {
+        final last = tail.last?.toString();
+        if (last != null && last.trim().isNotEmpty) {
+          return last.trim();
+        }
+      }
+    }
+    return null;
+  }
+
+  Future<void> _copyMt5SetupReport() async {
+    try {
+      final report = await _remote.fetchMt5EaSetupReport(accountId: _accountId);
+      const encoder = JsonEncoder.withIndent('  ');
+      await Clipboard.setData(ClipboardData(text: encoder.convert(report)));
+      if (!mounted) return;
+      setState(() => _notice = 'MT5 setup report copied.');
+    } catch (error) {
+      if (!mounted) return;
+      setState(() {
+        _notice =
+            'Could not copy MT5 setup report: ${error is ApiException ? error.message : error}';
+      });
+    }
+  }
+
+  Future<void> _copyMt5DemoHarnessReport() async {
+    try {
+      final report =
+          _mt5DemoHarnessReport ??
+          await _remote.fetchMt5DemoHarnessReport(accountId: _accountId);
+      const encoder = JsonEncoder.withIndent('  ');
+      await Clipboard.setData(ClipboardData(text: encoder.convert(report)));
+      if (!mounted) return;
+      setState(() => _notice = 'MT5 demo validation report copied.');
+    } catch (error) {
+      if (!mounted) return;
+      setState(() {
+        _notice =
+            'Could not copy demo validation report: ${error is ApiException ? error.message : error}';
+      });
+    }
+  }
+
+  Future<void> _copyMt5BackendUrl() async {
+    try {
+      await Clipboard.setData(const ClipboardData(text: ApiConfig.baseUrl));
+      if (!mounted) return;
+      setState(() {
+        _notice =
+            'Copied backend URL. In MT5: Tools -> Options -> Expert Advisors -> Allow WebRequest for listed URL.';
+      });
+    } catch (error) {
+      if (!mounted) return;
+      setState(() {
+        _notice = 'Could not copy backend URL: $error';
       });
     }
   }
 
   Future<void> _save() async {
-    final maxTrades = int.tryParse(_maxTradesController.text.trim());
-    final maxLoss = double.tryParse(_maxDailyLossController.text.trim());
-    final maxProfit = double.tryParse(_maxDailyProfitController.text.trim());
-    final fixedRisk = double.tryParse(_riskController.text.trim());
-    final newsMinutes = int.tryParse(_newsMinutesController.text.trim());
+    final input = GuardrailsParsedInput.tryParse(
+      maxTradesPerDay: _maxTradesController.text,
+      maxDailyLoss: _maxDailyLossController.text,
+      maxDailyProfit: _maxDailyProfitController.text,
+      fixedRiskPercent: _riskController.text,
+      tradingWindowStart: _windowStartController.text,
+      tradingWindowEnd: _windowEndController.text,
+      newsBlockMode: _newsMode,
+      newsWindowMinutes: _newsMinutesController.text,
+      tradeBlockingEnabled: _tradeBlockingEnabled,
+      blockHighImpactNews: _blockHighImpactNews,
+    );
 
-    if (maxTrades == null ||
-        maxLoss == null ||
-        maxProfit == null ||
-        fixedRisk == null ||
-        newsMinutes == null) {
+    if (input == null) {
       setState(() => _notice = 'Please enter valid numeric guardrails.');
       return;
     }
@@ -329,19 +854,19 @@ class _GuardrailsPageState extends State<GuardrailsPage> {
     try {
       await _remote.saveSettings(
         accountId: _accountId,
-        maxTradesPerDay: maxTrades,
-        maxDailyLoss: maxLoss,
-        maxDailyProfit: maxProfit,
-        fixedRiskPercent: fixedRisk,
-        tradingWindowStart: 'UTC+7 ${_windowStartController.text.trim()}',
-        tradingWindowEnd: 'UTC+7 ${_windowEndController.text.trim()}',
-        newsBlockMode: _newsMode,
-        newsWindowMinutes: newsMinutes,
-        tradeBlockingEnabled: _tradeBlockingEnabled,
+        maxTradesPerDay: input.maxTradesPerDay,
+        maxDailyLoss: input.maxDailyLoss,
+        maxDailyProfit: input.maxDailyProfit,
+        fixedRiskPercent: input.fixedRiskPercent,
+        tradingWindowStart: input.tradingWindowStart,
+        tradingWindowEnd: input.tradingWindowEnd,
+        newsBlockMode: input.newsBlockMode,
+        newsWindowMinutes: input.newsWindowMinutes,
+        tradeBlockingEnabled: input.tradeBlockingEnabled,
         blockMaxTrades: true,
         blockMaxDailyLoss: true,
         blockMaxDailyProfit: true,
-        blockHighImpactNews: _blockHighImpactNews,
+        blockHighImpactNews: input.blockHighImpactNews,
       );
       await _loadStatus();
       if (!mounted) return;
@@ -393,925 +918,30 @@ class _GuardrailsPageState extends State<GuardrailsPage> {
   }
 
   void _resetDefaults() {
+    final defaults = GuardrailsFormValues.defaults();
     setState(() {
-      _maxTradesController.text = '5';
-      _maxDailyLossController.text = '3000';
-      _maxDailyProfitController.text = '5000';
-      _riskController.text = '0.5';
-      _windowStartController.text = '07:00';
-      _windowEndController.text = '10:00';
-      _newsMinutesController.text = '30';
-      _newsMode = 'Before and After';
-      _tradeBlockingEnabled = false;
-      _blockHighImpactNews = true;
+      _applyFormValues(defaults);
       _notice = null;
     });
   }
 
   void _applySettings(Map<String, dynamic>? settings) {
-    if (settings == null) return;
-    final nested = settings['settings'] as Map<String, dynamic>? ?? {};
-    final pending = nested['pending_update'] as Map<String, dynamic>?;
-    final pendingChanges = pending?['changes'] as Map<String, dynamic>?;
-    final pendingNested =
-        pendingChanges?['settings'] as Map<String, dynamic>? ?? {};
-    final effectiveMaxTrades =
-        pendingChanges?['max_trades_per_day'] ?? settings['max_trades_per_day'];
-    final effectiveMaxDailyLoss =
-        pendingChanges?['max_daily_loss'] ?? settings['max_daily_loss'];
-    final effectiveBlockHighImpactNews =
-        pendingChanges?['block_high_impact_news'] ??
-        settings['block_high_impact_news'];
-    final effectiveWindowStart =
-        pendingChanges?['trading_window_start'] ??
-        settings['trading_window_start'];
-    final effectiveWindowEnd =
-        pendingChanges?['trading_window_end'] ?? settings['trading_window_end'];
-
-    _maxTradesController.text = '${(effectiveMaxTrades as num?)?.toInt() ?? 5}';
-    _maxDailyLossController.text =
-        '${((effectiveMaxDailyLoss ?? 3000) as num).toDouble().round()}';
-    _maxDailyProfitController.text =
-        '${((pendingNested['max_daily_profit'] ?? nested['max_daily_profit'] ?? 5000) as num).toDouble().round()}';
-    _riskController.text =
-        '${((pendingNested['fixed_risk_percent'] ?? nested['fixed_risk_percent'] ?? 0.5) as num).toDouble()}';
-    _newsMinutesController.text =
-        '${((pendingNested['news_window_minutes_before'] ?? nested['news_window_minutes_before'] ?? 30) as num).toInt()}';
-    _newsMode =
-        pendingNested['news_block_mode'] as String? ??
-        nested['news_block_mode'] as String? ??
-        _newsMode;
-    _tradeBlockingEnabled =
-        pendingNested['trade_blocking_enabled'] as bool? ??
-        nested['trade_blocking_enabled'] as bool? ??
-        false;
-    _blockHighImpactNews = effectiveBlockHighImpactNews as bool? ?? true;
-    _parseWindow(effectiveWindowStart as String?, true);
-    _parseWindow(effectiveWindowEnd as String?, false);
-  }
-
-  void _parseWindow(String? value, bool start) {
-    if (value == null || value.isEmpty) return;
-    final parts = value.split(' ');
-    if (parts.length >= 2) {
-      if (start) {
-        _windowStartController.text = parts.last;
-      } else {
-        _windowEndController.text = parts.last;
-      }
-    }
-  }
-}
-
-class _Header extends StatelessWidget {
-  final Map<String, dynamic>? status;
-  final bool loading;
-  final VoidCallback onRefresh;
-
-  const _Header({
-    required this.status,
-    required this.loading,
-    required this.onRefresh,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    final strings = AppLocalization.of(context);
-    final summary = status?['summary'] as Map<String, dynamic>? ?? {};
-    final critical = (summary['critical_count'] as num?)?.toInt() ?? 0;
-
-    return Row(
-      children: [
-        Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              strings.text('Account protection'),
-              style: TextStyle(
-                fontSize: 14,
-                fontWeight: FontWeight.w800,
-                color: AppColors.textPrimary,
-              ),
-            ),
-            const SizedBox(height: 6),
-            Text(
-              strings.text(
-                'Automated limits that keep your trading inside the plan, enforced directly on MT5.',
-              ),
-              style: TextStyle(
-                fontSize: 12,
-                color: AppColors.textSecondary,
-                fontWeight: FontWeight.w500,
-              ),
-            ),
-          ],
-        ),
-        const Spacer(),
-        if (critical > 0)
-          _AttentionPill(
-            text: '$critical ${strings.text('critical rule needs attention')}',
-          ),
-        const SizedBox(width: 10),
-        _IconAction(
-          icon: loading ? FluentIcons.sync : FluentIcons.refresh,
-          onTap: onRefresh,
-        ),
-      ],
-    );
-  }
-}
-
-class _AttentionPill extends StatelessWidget {
-  final String text;
-
-  const _AttentionPill({required this.text});
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
-      decoration: BoxDecoration(
-        color: AppColors.warning.withValues(alpha: 0.10),
-        borderRadius: BorderRadius.circular(999),
-        border: Border.all(color: AppColors.warning.withValues(alpha: 0.35)),
-      ),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Icon(FluentIcons.warning, size: 12, color: AppColors.warning),
-          const SizedBox(width: 6),
-          Text(
-            text,
-            style: TextStyle(
-              color: AppColors.warning,
-              fontSize: 11,
-              fontWeight: FontWeight.w700,
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _StatusStrip extends StatelessWidget {
-  final Map<String, dynamic>? status;
-
-  const _StatusStrip({required this.status});
-
-  @override
-  Widget build(BuildContext context) {
-    final strings = AppLocalization.of(context);
-    final summary = status?['summary'] as Map<String, dynamic>? ?? {};
-    final triggered = (summary['triggered_count'] as num?)?.toInt() ?? 0;
-    final critical = (summary['critical_count'] as num?)?.toInt() ?? 0;
-    final mode = status?['mode'] as String? ?? 'local_read_only';
-    final blocking = status?['trade_blocking_enabled'] as bool? ?? false;
-    final blocked = status?['trade_blocked'] as bool? ?? false;
-
-    return Row(
-      children: [
-        Expanded(
-          child: _StatusCard(
-            icon: FluentIcons.lock,
-            label: strings.text('Trade blocking'),
-            value: blocked
-                ? strings.text('Blocked')
-                : (blocking ? strings.text('Ready') : strings.text('Off')),
-            color: blocked
-                ? AppColors.danger
-                : (blocking ? AppColors.warning : AppColors.success),
-          ),
-        ),
-        const SizedBox(width: 12),
-        Expanded(
-          child: _StatusCard(
-            icon: FluentIcons.shield,
-            label: strings.text('Mode'),
-            value: strings.text(_modeLabel(mode)),
-            color: AppColors.primary,
-          ),
-        ),
-        const SizedBox(width: 12),
-        Expanded(
-          child: _StatusCard(
-            icon: FluentIcons.warning,
-            label: strings.text('Triggered rules'),
-            value: '$triggered ${strings.text('active')}',
-            color: triggered > 0 ? AppColors.warning : AppColors.success,
-          ),
-        ),
-        const SizedBox(width: 12),
-        Expanded(
-          child: _StatusCard(
-            icon: FluentIcons.error_badge,
-            label: strings.text('Critical'),
-            value: '$critical ${strings.text('critical')}',
-            color: critical > 0 ? AppColors.danger : AppColors.success,
-          ),
-        ),
-      ],
-    );
-  }
-}
-
-String _modeLabel(String value) {
-  final text = value.replaceAll('_', ' ');
-  if (text.isEmpty) return text;
-  return text[0].toUpperCase() + text.substring(1);
-}
-
-class _RulesPanel extends StatelessWidget {
-  final Map<String, dynamic>? status;
-  final Map<String, dynamic>? mt5BlockerStatus;
-
-  const _RulesPanel({required this.status, required this.mt5BlockerStatus});
-
-  @override
-  Widget build(BuildContext context) {
-    final strings = AppLocalization.of(context);
-    final checks = status?['checks'] as List<dynamic>? ?? const [];
-    final mt5Issue = _mt5TradeBlockerIssue(mt5BlockerStatus);
-    final tiles = <Widget>[
-      if (mt5Issue != null)
-        _RuleTile(
-          code: 'mt5_autotrading_disabled',
-          message: mt5Issue,
-          triggered: true,
-          severity: 'critical',
-        ),
-      ...checks.map((item) {
-        final json = item as Map<String, dynamic>;
-        return _RuleTile(
-          code: json['rule_code'] as String? ?? 'rule',
-          message: json['message'] as String? ?? '',
-          triggered: json['triggered'] as bool? ?? false,
-          severity: json['severity'] as String? ?? 'info',
-        );
-      }),
-    ];
-
-    return _Panel(
-      title: strings.text('Live rule checks'),
-      subtitle: strings.text(
-        'Reads local analytics and cached economic news in real time.',
-      ),
-      child: tiles.isEmpty ? _EmptyRules() : Column(children: tiles),
+    _applyFormValues(
+      GuardrailsFormValues.fromSettings(settings, includePendingUpdates: true),
     );
   }
 
-  String? _mt5TradeBlockerIssue(Map<String, dynamic>? status) {
-    final accounts = status?['accounts'] as Map<String, dynamic>?;
-    final account = accounts?['1'] as Map<String, dynamic>?;
-    final action = account?['mt5_action'] as Map<String, dynamic>?;
-    final failedActions =
-        action?['failed_actions'] as List<dynamic>? ?? const [];
-    for (final item in failedActions) {
-      final failedAction = item as Map<String, dynamic>;
-      final result = failedAction['result'] as Map<String, dynamic>?;
-      final retcode = (result?['retcode'] as num?)?.toInt();
-      final comment = result?['comment'] as String? ?? '';
-      if (retcode == 10027 || comment.contains('AutoTrading disabled')) {
-        return 'MT5 AutoTrading is off. Enable Algo Trading in MT5 so the blocker can close rejected trades.';
-      }
-    }
-    final error = action?['error'] as String?;
-    if (error != null && error.isNotEmpty) {
-      return 'MT5 blocker error: $error';
-    }
-    return null;
-  }
-}
-
-class _Panel extends StatelessWidget {
-  final String title;
-  final String subtitle;
-  final Widget child;
-
-  const _Panel({
-    required this.title,
-    required this.subtitle,
-    required this.child,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.fromLTRB(16, 15, 16, 16),
-      decoration: BoxDecoration(
-        color: AppColors.surface,
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: AppColors.border),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
-            title,
-            style: TextStyle(
-              color: AppColors.textPrimary,
-              fontSize: 13,
-              fontWeight: FontWeight.w800,
-            ),
-          ),
-          const SizedBox(height: 4),
-          Text(
-            subtitle,
-            style: TextStyle(
-              color: AppColors.textSecondary,
-              fontSize: 10,
-              fontWeight: FontWeight.w500,
-            ),
-          ),
-          const SizedBox(height: 12),
-          child,
-        ],
-      ),
-    );
-  }
-}
-
-class _SettingRow extends StatelessWidget {
-  final IconData icon;
-  final String title;
-  final String description;
-  final Widget control;
-
-  const _SettingRow({
-    required this.icon,
-    required this.title,
-    required this.description,
-    required this.control,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.symmetric(vertical: 9),
-      decoration: BoxDecoration(
-        border: Border(
-          bottom: BorderSide(color: AppColors.border.withValues(alpha: 0.75)),
-        ),
-      ),
-      child: LayoutBuilder(
-        builder: (context, constraints) {
-          final compact = constraints.maxWidth < 620;
-          final titleBlock = Row(
-            children: [
-              Container(
-                width: 34,
-                height: 32,
-                alignment: Alignment.center,
-                decoration: BoxDecoration(
-                  color: AppColors.primarySoft,
-                  borderRadius: BorderRadius.circular(9),
-                ),
-                child: Icon(icon, size: 14, color: AppColors.primary),
-              ),
-              const SizedBox(width: 10),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      title,
-                      style: TextStyle(
-                        color: AppColors.textPrimary,
-                        fontSize: 11,
-                        fontWeight: FontWeight.w800,
-                      ),
-                    ),
-                    const SizedBox(height: 2),
-                    Text(
-                      description,
-                      style: TextStyle(
-                        color: AppColors.textSecondary,
-                        fontSize: 9,
-                        fontWeight: FontWeight.w500,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ],
-          );
-
-          if (compact) {
-            return Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                titleBlock,
-                const SizedBox(height: 12),
-                Align(alignment: Alignment.centerLeft, child: control),
-              ],
-            );
-          }
-
-          return Row(
-            children: [
-              Expanded(child: titleBlock),
-              const SizedBox(width: 10),
-              ConstrainedBox(
-                constraints: const BoxConstraints(maxWidth: 260),
-                child: Align(alignment: Alignment.centerRight, child: control),
-              ),
-            ],
-          );
-        },
-      ),
-    );
-  }
-}
-
-class _Field extends StatelessWidget {
-  final TextEditingController controller;
-  final String? prefix;
-  final String? suffix;
-  final double width;
-  final bool enabled;
-
-  const _Field({
-    required this.controller,
-    this.prefix,
-    this.suffix,
-    this.width = 116,
-    this.enabled = true,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return SizedBox(
-      width: width,
-      height: 32,
-      child: TextBox(
-        controller: controller,
-        enabled: enabled,
-        prefix: prefix == null ? null : _FieldAffix(prefix!),
-        suffix: suffix == null ? null : _FieldAffix(suffix!),
-        textAlign: TextAlign.right,
-        style: TextStyle(
-          color: AppColors.textPrimary,
-          fontSize: 11,
-          fontWeight: FontWeight.w700,
-        ),
-        decoration: WidgetStatePropertyAll(
-          BoxDecoration(
-            color: AppColors.surfaceAlt,
-            borderRadius: BorderRadius.circular(9),
-            border: Border.all(color: AppColors.border),
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-class _FieldAffix extends StatelessWidget {
-  final String text;
-
-  const _FieldAffix(this.text);
-
-  @override
-  Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 8),
-      child: Text(
-        text,
-        style: TextStyle(
-          color: AppColors.textSecondary,
-          fontSize: 11,
-          fontWeight: FontWeight.w800,
-        ),
-      ),
-    );
-  }
-}
-
-class _Select extends StatelessWidget {
-  final String value;
-  final List<String> values;
-  final ValueChanged<String>? onChanged;
-  final double width;
-
-  const _Select({
-    required this.value,
-    required this.values,
-    required this.onChanged,
-    required this.width,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return SizedBox(
-      width: width,
-      height: 32,
-      child: ComboBox<String>(
-        value: value,
-        items: values
-            .map(
-              (item) => ComboBoxItem(
-                value: item,
-                child: Text(item, overflow: TextOverflow.ellipsis),
-              ),
-            )
-            .toList(),
-        onChanged: onChanged == null
-            ? null
-            : (next) {
-                if (next != null) onChanged?.call(next);
-              },
-      ),
-    );
-  }
-}
-
-class _TimeZoneBadge extends StatelessWidget {
-  const _TimeZoneBadge();
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      width: 58,
-      height: 28,
-      alignment: Alignment.center,
-      decoration: BoxDecoration(
-        color: AppColors.surfaceAlt,
-        borderRadius: BorderRadius.circular(8),
-        border: Border.all(color: AppColors.border),
-      ),
-      child: Text(
-        'UTC+7',
-        style: TextStyle(
-          color: AppColors.textPrimary,
-          fontSize: 10,
-          fontWeight: FontWeight.w700,
-        ),
-      ),
-    );
-  }
-}
-
-class _StatusCard extends StatelessWidget {
-  final IconData icon;
-  final String label;
-  final String value;
-  final Color color;
-
-  const _StatusCard({
-    required this.icon,
-    required this.label,
-    required this.value,
-    required this.color,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      height: 64,
-      padding: const EdgeInsets.symmetric(horizontal: 14),
-      decoration: BoxDecoration(
-        color: AppColors.surface,
-        borderRadius: BorderRadius.circular(10),
-        border: Border.all(color: AppColors.border),
-      ),
-      child: Row(
-        children: [
-          Container(
-            width: 34,
-            height: 34,
-            alignment: Alignment.center,
-            decoration: BoxDecoration(
-              color: color.withValues(alpha: 0.12),
-              borderRadius: BorderRadius.circular(9),
-            ),
-            child: Icon(icon, size: 14, color: color),
-          ),
-          const SizedBox(width: 10),
-          Expanded(
-            child: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  label,
-                  style: TextStyle(
-                    color: AppColors.textSecondary,
-                    fontSize: 10,
-                    fontWeight: FontWeight.w800,
-                  ),
-                ),
-                const SizedBox(height: 3),
-                Text(
-                  value,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: TextStyle(
-                    color: color,
-                    fontSize: 12,
-                    fontWeight: FontWeight.w800,
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _RuleTile extends StatelessWidget {
-  final String code;
-  final String message;
-  final bool triggered;
-  final String severity;
-
-  const _RuleTile({
-    required this.code,
-    required this.message,
-    required this.triggered,
-    required this.severity,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    final strings = AppLocalization.of(context);
-    final color = triggered
-        ? (severity == 'critical' ? AppColors.danger : AppColors.warning)
-        : AppColors.success;
-    final title = _localizedRuleTitle(strings, code);
-    final detail = _localizedRuleMessage(strings, code, message);
-
-    return Container(
-      margin: const EdgeInsets.only(bottom: 8),
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-      decoration: BoxDecoration(
-        color: color.withValues(alpha: 0.10),
-        borderRadius: BorderRadius.circular(10),
-        border: Border.all(color: color.withValues(alpha: 0.26)),
-      ),
-      child: Row(
-        children: [
-          Container(
-            width: 18,
-            height: 18,
-            alignment: Alignment.center,
-            decoration: BoxDecoration(
-              color: color,
-              borderRadius: BorderRadius.circular(999),
-            ),
-            child: Icon(
-              triggered ? FluentIcons.cancel : FluentIcons.check_mark,
-              size: 9,
-              color: Colors.white,
-            ),
-          ),
-          const SizedBox(width: 10),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  title,
-                  style: TextStyle(
-                    color: AppColors.textPrimary,
-                    fontSize: 11,
-                    fontWeight: FontWeight.w800,
-                  ),
-                ),
-                const SizedBox(height: 3),
-                Text(
-                  detail,
-                  maxLines: 2,
-                  overflow: TextOverflow.ellipsis,
-                  style: TextStyle(
-                    color: AppColors.textSecondary,
-                    fontSize: 9,
-                    fontWeight: FontWeight.w500,
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-String _localizedRuleTitle(AppStrings strings, String code) {
-  final english = switch (code) {
-    'max_daily_loss' => 'Max daily loss reached',
-    'max_daily_profit' => 'Max daily profit reached',
-    'max_trades_per_day' => 'Too many trades today',
-    'risk_per_trade' => 'Risk too high',
-    'high_impact_news' => 'High impact news window',
-    'revenge_trading' => 'Revenge trading pattern',
-    'rule_break_count' => 'Rule break count',
-    'mt5_autotrading_disabled' => 'MT5 AutoTrading is off',
-    _ => _titleCase(code.replaceAll('_', ' ')),
-  };
-  if (!strings.isVietnamese) return english;
-  return switch (code) {
-    'max_daily_loss' => 'Cham lo toi da ngay',
-    'max_daily_profit' => 'Cham lai toi da ngay',
-    'max_trades_per_day' => 'Qua nhieu lenh hom nay',
-    'risk_per_trade' => 'Rui ro moi lenh qua cao',
-    'high_impact_news' => 'Khung tin tac dong manh',
-    'revenge_trading' => 'Dau hieu revenge trading',
-    'rule_break_count' => 'So rule dang vi pham',
-    'mt5_autotrading_disabled' => 'MT5 AutoTrading dang tat',
-    _ => english,
-  };
-}
-
-String _localizedRuleMessage(AppStrings strings, String code, String message) {
-  if (!strings.isVietnamese) return message;
-
-  final numbers = RegExp(r'-?\d+(?:\.\d+)?').allMatches(message).toList();
-  String numberAt(int index, String fallback) {
-    if (index >= numbers.length) return fallback;
-    return numbers[index].group(0) ?? fallback;
-  }
-
-  return switch (code) {
-    'max_daily_loss' =>
-      'PnL ngay ${numberAt(0, '-')} da cham muc lo toi da ${numberAt(1, '-')}.',
-    'max_daily_profit' =>
-      'PnL ngay ${numberAt(0, '-')} da cham muc lai toi da ${numberAt(1, '-')}.',
-    'max_trades_per_day' =>
-      '${numberAt(0, '0')} lenh hom nay; gioi han toi da la ${numberAt(1, '-')}.',
-    'risk_per_trade' =>
-      '${numberAt(0, '0')} lenh vuot rui ro moi lenh ${numberAt(1, '-')}.',
-    'high_impact_news' =>
-      '${numberAt(0, '0')} tin do dang nam trong khung chan tin.',
-    'revenge_trading' => 'Khong phat hien mau revenge trading.',
-    'rule_break_count' => '${numberAt(0, '0')} rule chua duoc xu ly.',
-    'mt5_autotrading_disabled' =>
-      'Bat Algo Trading trong MT5 de bo chan co the dong lenh bi tu choi.',
-    _ => message,
-  };
-}
-
-String _titleCase(String value) {
-  if (value.isEmpty) return value;
-  return value
-      .split(' ')
-      .where((part) => part.isNotEmpty)
-      .map((part) => part[0].toUpperCase() + part.substring(1))
-      .join(' ');
-}
-
-class _EmptyRules extends StatelessWidget {
-  @override
-  Widget build(BuildContext context) {
-    final strings = AppLocalization.of(context);
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: AppColors.surfaceAlt,
-        borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: AppColors.border),
-      ),
-      child: Text(
-        strings.isVietnamese
-            ? 'Chua tai kiem tra truc tiep. Hay khoi dong backend hoac lam moi trang.'
-            : 'No live checks loaded yet. Start the backend or refresh this page.',
-        style: TextStyle(
-          color: AppColors.textSecondary,
-          fontSize: 12,
-          fontWeight: FontWeight.w700,
-        ),
-      ),
-    );
-  }
-}
-
-class _Notice extends StatelessWidget {
-  final String text;
-
-  const _Notice({required this.text});
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-      decoration: BoxDecoration(
-        color: AppColors.warning.withValues(alpha: 0.11),
-        borderRadius: BorderRadius.circular(9),
-        border: Border.all(color: AppColors.warning.withValues(alpha: 0.30)),
-      ),
-      child: Row(
-        children: [
-          Icon(FluentIcons.info, size: 13, color: AppColors.warning),
-          const SizedBox(width: 8),
-          Expanded(
-            child: Text(
-              text,
-              style: TextStyle(
-                color: AppColors.warning,
-                fontSize: 12,
-                fontWeight: FontWeight.w700,
-              ),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _OutlineAction extends StatelessWidget {
-  final String label;
-  final VoidCallback? onTap;
-
-  const _OutlineAction({required this.label, required this.onTap});
-
-  @override
-  Widget build(BuildContext context) {
-    return GestureDetector(
-      onTap: onTap,
-      child: Container(
-        height: 36,
-        padding: const EdgeInsets.symmetric(horizontal: 14),
-        alignment: Alignment.center,
-        decoration: BoxDecoration(
-          color: onTap == null ? AppColors.surfaceAlt : AppColors.surface,
-          borderRadius: BorderRadius.circular(9),
-          border: Border.all(color: AppColors.border),
-        ),
-        child: Text(
-          label,
-          style: TextStyle(
-            color: onTap == null
-                ? AppColors.textSecondary.withValues(alpha: 0.55)
-                : AppColors.textSecondary,
-            fontSize: 12,
-            fontWeight: FontWeight.w800,
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-class _PrimaryAction extends StatelessWidget {
-  final String label;
-  final VoidCallback? onTap;
-
-  const _PrimaryAction({required this.label, required this.onTap});
-
-  @override
-  Widget build(BuildContext context) {
-    return GestureDetector(
-      onTap: onTap,
-      child: Container(
-        height: 38,
-        padding: const EdgeInsets.symmetric(horizontal: 18),
-        alignment: Alignment.center,
-        decoration: BoxDecoration(
-          color: onTap == null
-              ? AppColors.primary.withValues(alpha: 0.55)
-              : AppColors.primary,
-          borderRadius: BorderRadius.circular(9),
-        ),
-        child: Text(
-          label,
-          style: const TextStyle(
-            color: Colors.white,
-            fontSize: 12,
-            fontWeight: FontWeight.w800,
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-class _IconAction extends StatelessWidget {
-  final IconData icon;
-  final VoidCallback onTap;
-
-  const _IconAction({required this.icon, required this.onTap});
-
-  @override
-  Widget build(BuildContext context) {
-    return GestureDetector(
-      onTap: onTap,
-      child: Container(
-        width: 36,
-        height: 36,
-        alignment: Alignment.center,
-        decoration: BoxDecoration(
-          color: AppColors.surface,
-          borderRadius: BorderRadius.circular(9),
-          border: Border.all(color: AppColors.border),
-        ),
-        child: Icon(icon, size: 15, color: AppColors.textSecondary),
-      ),
-    );
+  void _applyFormValues(GuardrailsFormValues values) {
+    _maxTradesController.text = values.maxTradesPerDay;
+    _maxDailyLossController.text = values.maxDailyLoss;
+    _maxDailyProfitController.text = values.maxDailyProfit;
+    _riskController.text = values.fixedRiskPercent;
+    _windowStartController.text = values.tradingWindowStart;
+    _windowEndController.text = values.tradingWindowEnd;
+    _newsMinutesController.text = values.newsWindowMinutes;
+    _newsMode = values.newsBlockMode;
+    _tradeBlockingEnabled = values.tradeBlockingEnabled;
+    _blockHighImpactNews = values.blockHighImpactNews;
   }
 }
 
@@ -1343,10 +973,14 @@ class _BlockBanner extends StatelessWidget {
       width: double.infinity,
       padding: EdgeInsets.symmetric(horizontal: 14, vertical: 10),
       decoration: BoxDecoration(
-        color: (isFullDay ? AppColors.danger : AppColors.warning).withValues(alpha: 0.10),
+        color: (isFullDay ? AppColors.danger : AppColors.warning).withValues(
+          alpha: 0.10,
+        ),
         borderRadius: BorderRadius.circular(10),
         border: Border.all(
-          color: (isFullDay ? AppColors.danger : AppColors.warning).withValues(alpha: 0.20),
+          color: (isFullDay ? AppColors.danger : AppColors.warning).withValues(
+            alpha: 0.20,
+          ),
         ),
       ),
       child: Row(
@@ -1362,7 +996,9 @@ class _BlockBanner extends StatelessWidget {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  isFullDay ? 'Trading blocked for the day' : 'Trading blocked temporarily',
+                  isFullDay
+                      ? 'Trading blocked for the day'
+                      : 'Trading blocked temporarily',
                   style: TextStyle(
                     fontSize: 13,
                     fontWeight: FontWeight.w700,
@@ -1371,11 +1007,12 @@ class _BlockBanner extends StatelessWidget {
                 ),
                 SizedBox(height: 2),
                 Text(
-                  '$triggerInfo — $countdown',
+                  '$triggerInfo - $countdown',
                   style: TextStyle(
                     fontSize: 11,
                     fontWeight: FontWeight.w500,
-                    color: (isFullDay ? AppColors.danger : AppColors.warning).withValues(alpha: 0.8),
+                    color: (isFullDay ? AppColors.danger : AppColors.warning)
+                        .withValues(alpha: 0.8),
                   ),
                 ),
               ],

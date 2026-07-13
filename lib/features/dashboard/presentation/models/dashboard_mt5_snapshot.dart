@@ -266,10 +266,6 @@ class DashboardApiView {
     required this.chartPoints,
   });
 
-  factory DashboardApiView.sample() {
-    return DashboardApiView.empty();
-  }
-
   factory DashboardApiView.empty() {
     return DashboardApiView(
       snapshot: DashboardMt5Snapshot.empty(),
@@ -543,7 +539,8 @@ class DashboardBlockState {
       blockedAt: _nullableString(json['blocked_at']),
       expiresAt: _nullableString(json['expires_at']),
       remainingSeconds: _int(json['remaining_seconds']),
-      triggeredBy: (json['triggered_by'] as List<dynamic>?)
+      triggeredBy:
+          (json['triggered_by'] as List<dynamic>?)
               ?.map((e) => e.toString())
               .toList(growable: false) ??
           const [],

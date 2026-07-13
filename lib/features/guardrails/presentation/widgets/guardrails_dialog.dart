@@ -3,7 +3,11 @@ import 'package:fluent_ui/fluent_ui.dart';
 import '../../../../app/i18n/app_localization.dart';
 import '../../../../app/state/active_account_session.dart';
 import '../../../../app/theme/app_colors.dart';
+import '../../guardrails_defaults.dart';
+import '../../guardrails_form_support.dart';
 import '../../data/datasources/guardrails_remote_datasource.dart';
+import 'guardrails_form_controls.dart';
+import 'guardrails_time_zone_badge.dart';
 
 Future<bool?> showGuardrailsDialog(BuildContext context) {
   return showDialog<bool>(
@@ -23,16 +27,31 @@ class GuardrailsDialog extends StatefulWidget {
 class _GuardrailsDialogState extends State<GuardrailsDialog> {
   int get _accountId => ActiveAccountSession.accountId;
 
+  static final _defaults = GuardrailsFormValues.defaults();
   final _remoteDataSource = GuardrailsRemoteDataSource();
-  final _maxTradesController = TextEditingController(text: '3');
-  final _maxDailyLossController = TextEditingController(text: '1000');
-  final _maxDailyProfitController = TextEditingController(text: '5000');
-  final _fixedRiskController = TextEditingController(text: '0.5');
-  final _windowStartController = TextEditingController(text: '07:00');
-  final _windowEndController = TextEditingController(text: '10:00');
-  final _newsMinutesController = TextEditingController(text: '15');
+  final _maxTradesController = TextEditingController(
+    text: _defaults.maxTradesPerDay,
+  );
+  final _maxDailyLossController = TextEditingController(
+    text: _defaults.maxDailyLoss,
+  );
+  final _maxDailyProfitController = TextEditingController(
+    text: _defaults.maxDailyProfit,
+  );
+  final _fixedRiskController = TextEditingController(
+    text: _defaults.fixedRiskPercent,
+  );
+  final _windowStartController = TextEditingController(
+    text: _defaults.tradingWindowStart,
+  );
+  final _windowEndController = TextEditingController(
+    text: _defaults.tradingWindowEnd,
+  );
+  final _newsMinutesController = TextEditingController(
+    text: _defaults.newsWindowMinutes,
+  );
 
-  String _newsBlockMode = 'Before and After';
+  String _newsBlockMode = _defaults.newsBlockMode;
   bool _loading = true;
   bool _saving = false;
   String? _errorMessage;
@@ -123,16 +142,22 @@ class _GuardrailsDialogState extends State<GuardrailsDialog> {
               ),
               _GuardrailRow(
                 label: strings.text('Max trades per day'),
-                control: _SmallTextBox(controller: _maxTradesController),
+                control: GuardrailsTextField(
+                  controller: _maxTradesController,
+                  width: 96,
+                  height: 30,
+                  fontSize: 12,
+                  borderRadius: 7,
+                ),
               ),
               _GuardrailRow(
                 label: strings.text('Max daily loss'),
-                control: _MoneyInput(controller: _maxDailyLossController),
+                control: GuardrailsMoneyInput(controller: _maxDailyLossController),
                 helper: strings.text('Uses realized PnL.'),
               ),
               _GuardrailRow(
                 label: strings.text('Max daily profit'),
-                control: _MoneyInput(controller: _maxDailyProfitController),
+                control: GuardrailsMoneyInput(controller: _maxDailyProfitController),
                 helper: strings.text('Uses realized PnL.'),
               ),
               _GuardrailRow(
@@ -140,7 +165,13 @@ class _GuardrailsDialogState extends State<GuardrailsDialog> {
                 control: Row(
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    _SmallTextBox(controller: _fixedRiskController, width: 82),
+                    GuardrailsTextField(
+                      controller: _fixedRiskController,
+                      width: 82,
+                      height: 30,
+                      fontSize: 12,
+                      borderRadius: 7,
+                    ),
                     const SizedBox(width: 8),
                     Text(
                       '%',
@@ -159,14 +190,28 @@ class _GuardrailsDialogState extends State<GuardrailsDialog> {
                 control: Row(
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    const _TimeZoneBadge(width: 96),
-                    const SizedBox(width: 8),
-                    _SmallTextBox(
-                      controller: _windowStartController,
-                      width: 76,
+                    const GuardrailsTimeZoneBadge(
+                      width: 96,
+                      height: 30,
+                      radius: 7,
+                      fontSize: 12,
                     ),
                     const SizedBox(width: 8),
-                    _SmallTextBox(controller: _windowEndController, width: 76),
+                    GuardrailsTextField(
+                      controller: _windowStartController,
+                      width: 76,
+                      height: 30,
+                      fontSize: 12,
+                      borderRadius: 7,
+                    ),
+                    const SizedBox(width: 8),
+                    GuardrailsTextField(
+                      controller: _windowEndController,
+                      width: 76,
+                      height: 30,
+                      fontSize: 12,
+                      borderRadius: 7,
+                    ),
                   ],
                 ),
                 helper: strings.text('Lot size auto-adjusts to match risk.'),
@@ -176,21 +221,21 @@ class _GuardrailsDialogState extends State<GuardrailsDialog> {
                 control: Row(
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    _DropdownValue(
+                    GuardrailsSelect(
                       value: _newsBlockMode,
-                      values: const [
-                        'Before and After',
-                        'Before only',
-                        'After only',
-                      ],
+                      values: GuardrailsDefaults.newsBlockModes,
                       onChanged: (value) =>
                           setState(() => _newsBlockMode = value),
                       width: 154,
+                      height: 30,
                     ),
                     const SizedBox(width: 8),
-                    _SmallTextBox(
+                    GuardrailsTextField(
                       controller: _newsMinutesController,
                       width: 64,
+                      height: 30,
+                      fontSize: 12,
+                      borderRadius: 7,
                     ),
                     const SizedBox(width: 8),
                     Text(
@@ -262,15 +307,9 @@ class _GuardrailsDialogState extends State<GuardrailsDialog> {
   }
 
   void _resetDefaults() {
+    final defaults = GuardrailsFormValues.defaults();
     setState(() {
-      _maxTradesController.text = '3';
-      _maxDailyLossController.text = '1000';
-      _maxDailyProfitController.text = '5000';
-      _fixedRiskController.text = '0.5';
-      _windowStartController.text = '07:00';
-      _windowEndController.text = '10:00';
-      _newsMinutesController.text = '15';
-      _newsBlockMode = 'Before and After';
+      _applyFormValues(defaults);
       _errorMessage = null;
     });
   }
@@ -279,29 +318,9 @@ class _GuardrailsDialogState extends State<GuardrailsDialog> {
     try {
       final status = await _remoteDataSource.fetchStatus(accountId: _accountId);
       final settings = status['settings'] as Map<String, dynamic>? ?? {};
-      final nested = settings['settings'] as Map<String, dynamic>? ?? {};
       if (!mounted) return;
       setState(() {
-        _maxTradesController.text =
-            '${(settings['max_trades_per_day'] as num?)?.toInt() ?? 3}';
-        _maxDailyLossController.text = _moneyText(
-          (settings['max_daily_loss'] as num?)?.toDouble() ?? 1000,
-        );
-        _maxDailyProfitController.text = _moneyText(
-          (nested['max_daily_profit'] as num?)?.toDouble() ?? 5000,
-        );
-        _fixedRiskController.text = _numberText(
-          (nested['fixed_risk_percent'] as num?)?.toDouble() ?? 0.5,
-        );
-        _newsMinutesController.text =
-            '${(nested['news_window_minutes_before'] as num?)?.toInt() ?? 15}';
-        _newsBlockMode =
-            nested['news_block_mode'] as String? ?? 'Before and After';
-        _applyWindow(
-          settings['trading_window_start'] as String?,
-          isStart: true,
-        );
-        _applyWindow(settings['trading_window_end'] as String?, isStart: false);
+        _applyFormValues(GuardrailsFormValues.fromSettings(settings));
         _loading = false;
         _errorMessage = null;
       });
@@ -316,17 +335,20 @@ class _GuardrailsDialogState extends State<GuardrailsDialog> {
   }
 
   Future<void> _save() async {
-    final maxTrades = int.tryParse(_maxTradesController.text.trim());
-    final maxLoss = double.tryParse(_maxDailyLossController.text.trim());
-    final maxProfit = double.tryParse(_maxDailyProfitController.text.trim());
-    final fixedRisk = double.tryParse(_fixedRiskController.text.trim());
-    final newsMinutes = int.tryParse(_newsMinutesController.text.trim());
+    final input = GuardrailsParsedInput.tryParse(
+      maxTradesPerDay: _maxTradesController.text,
+      maxDailyLoss: _maxDailyLossController.text,
+      maxDailyProfit: _maxDailyProfitController.text,
+      fixedRiskPercent: _fixedRiskController.text,
+      tradingWindowStart: _windowStartController.text,
+      tradingWindowEnd: _windowEndController.text,
+      newsBlockMode: _newsBlockMode,
+      newsWindowMinutes: _newsMinutesController.text,
+      tradeBlockingEnabled: false,
+      blockHighImpactNews: true,
+    );
 
-    if (maxTrades == null ||
-        maxLoss == null ||
-        maxProfit == null ||
-        fixedRisk == null ||
-        newsMinutes == null) {
+    if (input == null) {
       setState(() => _errorMessage = 'Please enter valid numeric guardrails.');
       return;
     }
@@ -339,19 +361,19 @@ class _GuardrailsDialogState extends State<GuardrailsDialog> {
     try {
       await _remoteDataSource.saveSettings(
         accountId: _accountId,
-        maxTradesPerDay: maxTrades,
-        maxDailyLoss: maxLoss,
-        maxDailyProfit: maxProfit,
-        fixedRiskPercent: fixedRisk,
-        tradingWindowStart: 'UTC+7 ${_windowStartController.text.trim()}',
-        tradingWindowEnd: 'UTC+7 ${_windowEndController.text.trim()}',
-        newsBlockMode: _newsBlockMode,
-        newsWindowMinutes: newsMinutes,
-        tradeBlockingEnabled: false,
+        maxTradesPerDay: input.maxTradesPerDay,
+        maxDailyLoss: input.maxDailyLoss,
+        maxDailyProfit: input.maxDailyProfit,
+        fixedRiskPercent: input.fixedRiskPercent,
+        tradingWindowStart: input.tradingWindowStart,
+        tradingWindowEnd: input.tradingWindowEnd,
+        newsBlockMode: input.newsBlockMode,
+        newsWindowMinutes: input.newsWindowMinutes,
+        tradeBlockingEnabled: input.tradeBlockingEnabled,
         blockMaxTrades: true,
         blockMaxDailyLoss: true,
         blockMaxDailyProfit: true,
-        blockHighImpactNews: true,
+        blockHighImpactNews: input.blockHighImpactNews,
       );
       if (!mounted) return;
       Navigator.pop(context, true);
@@ -364,28 +386,16 @@ class _GuardrailsDialogState extends State<GuardrailsDialog> {
     }
   }
 
-  void _applyWindow(String? value, {required bool isStart}) {
-    if (value == null || value.isEmpty) return;
-    final parts = value.split(RegExp(r'\s+'));
-    if (parts.length < 2) return;
-    if (isStart) {
-      _windowStartController.text = parts.last;
-    } else {
-      _windowEndController.text = parts.last;
-    }
+  void _applyFormValues(GuardrailsFormValues values) {
+    _maxTradesController.text = values.maxTradesPerDay;
+    _maxDailyLossController.text = values.maxDailyLoss;
+    _maxDailyProfitController.text = values.maxDailyProfit;
+    _fixedRiskController.text = values.fixedRiskPercent;
+    _windowStartController.text = values.tradingWindowStart;
+    _windowEndController.text = values.tradingWindowEnd;
+    _newsMinutesController.text = values.newsWindowMinutes;
+    _newsBlockMode = values.newsBlockMode;
   }
-}
-
-String _moneyText(double value) {
-  return value == value.roundToDouble()
-      ? value.toStringAsFixed(0)
-      : value.toStringAsFixed(2);
-}
-
-String _numberText(double value) {
-  return value == value.roundToDouble()
-      ? value.toStringAsFixed(0)
-      : value.toString();
 }
 
 class _GuardrailRow extends StatelessWidget {
@@ -440,147 +450,10 @@ class _GuardrailRow extends StatelessWidget {
           else
             const Spacer(),
           const SizedBox(width: 12),
-          _RecommendedBadge(),
+          const GuardrailsRecommendedBadge(),
           const SizedBox(width: 10),
           Icon(FluentIcons.info, size: 14, color: AppColors.textSecondary),
         ],
-      ),
-    );
-  }
-}
-
-class _SmallTextBox extends StatelessWidget {
-  final TextEditingController controller;
-  final double width;
-
-  const _SmallTextBox({required this.controller, this.width = 96});
-
-  @override
-  Widget build(BuildContext context) {
-    return SizedBox(
-      width: width,
-      height: 30,
-      child: TextBox(
-        controller: controller,
-        style: TextStyle(
-          fontSize: 12,
-          fontWeight: FontWeight.w700,
-          color: AppColors.textPrimary,
-        ),
-        decoration: WidgetStatePropertyAll(
-          BoxDecoration(
-            color: AppColors.surfaceAlt,
-            borderRadius: BorderRadius.circular(7),
-            border: Border.all(color: AppColors.border),
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-class _TimeZoneBadge extends StatelessWidget {
-  final double width;
-
-  const _TimeZoneBadge({this.width = 96});
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      width: width,
-      height: 30,
-      alignment: Alignment.center,
-      decoration: BoxDecoration(
-        color: AppColors.surfaceAlt,
-        borderRadius: BorderRadius.circular(7),
-        border: Border.all(color: AppColors.border),
-      ),
-      child: Text(
-        'UTC+7',
-        style: TextStyle(
-          fontSize: 12,
-          color: AppColors.textPrimary,
-          fontWeight: FontWeight.w700,
-        ),
-      ),
-    );
-  }
-}
-
-class _MoneyInput extends StatelessWidget {
-  final TextEditingController controller;
-
-  const _MoneyInput({required this.controller});
-
-  @override
-  Widget build(BuildContext context) {
-    return Row(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        Text(
-          r'$',
-          style: TextStyle(
-            fontSize: 12,
-            color: AppColors.textSecondary,
-            fontWeight: FontWeight.w800,
-          ),
-        ),
-        const SizedBox(width: 6),
-        _SmallTextBox(controller: controller, width: 104),
-      ],
-    );
-  }
-}
-
-class _DropdownValue extends StatelessWidget {
-  final String value;
-  final List<String> values;
-  final ValueChanged<String> onChanged;
-  final double width;
-
-  const _DropdownValue({
-    required this.value,
-    required this.values,
-    required this.onChanged,
-    required this.width,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return SizedBox(
-      width: width,
-      height: 30,
-      child: ComboBox<String>(
-        value: value,
-        items: values
-            .map((item) => ComboBoxItem<String>(value: item, child: Text(item)))
-            .toList(),
-        onChanged: (next) {
-          if (next != null) onChanged(next);
-        },
-      ),
-    );
-  }
-}
-
-class _RecommendedBadge extends StatelessWidget {
-  const _RecommendedBadge();
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 4),
-      decoration: BoxDecoration(
-        color: AppColors.primarySoft,
-        borderRadius: BorderRadius.circular(999),
-      ),
-      child: Text(
-        'Recommended',
-        style: TextStyle(
-          fontSize: 10,
-          fontWeight: FontWeight.w800,
-          color: AppColors.primary,
-        ),
       ),
     );
   }

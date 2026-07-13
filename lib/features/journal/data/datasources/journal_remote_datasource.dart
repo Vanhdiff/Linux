@@ -1,17 +1,24 @@
 import '../../../../app/services/api/api_client.dart';
+import '../../../../app/services/backend/backend_process_service.dart';
 import '../../../../app/state/active_account_session.dart';
-import '../../presentation/data/journal_sample_data.dart';
+import '../defaults/journal_defaults.dart';
 
 class JournalRemoteDataSource {
   final ApiClient _apiClient;
+  final BackendProcessService _backend;
   final int? accountIdOverride;
 
-  JournalRemoteDataSource({ApiClient? apiClient, this.accountIdOverride})
-    : _apiClient = apiClient ?? ApiClient();
+  JournalRemoteDataSource({
+    ApiClient? apiClient,
+    BackendProcessService? backend,
+    this.accountIdOverride,
+  }) : _apiClient = apiClient ?? ApiClient(),
+       _backend = backend ?? BackendProcessService();
 
   int get accountId => accountIdOverride ?? ActiveAccountSession.accountId;
 
   Future<List<JournalOverviewTrade>> fetchTrades() async {
+    await _backend.ensureRunning();
     final response = await _apiClient.getJson(
       '/trades',
       queryParameters: {'account_id': '$accountId'},
@@ -54,6 +61,7 @@ class JournalRemoteDataSource {
     required int year,
     required int month,
   }) async {
+    await _backend.ensureRunning();
     final response = await _apiClient.getJson(
       '/journal/calendar',
       queryParameters: {
@@ -104,6 +112,7 @@ class JournalRemoteDataSource {
     required int year,
     required int month,
   }) async {
+    await _backend.ensureRunning();
     final response =
         await _apiClient.getJson(
               '/journal/month-summary',
@@ -141,6 +150,7 @@ class JournalRemoteDataSource {
     required int year,
     required int month,
   }) async {
+    await _backend.ensureRunning();
     final response =
         await _apiClient.getJson(
               '/journal/month-summary',
@@ -165,6 +175,7 @@ class JournalRemoteDataSource {
   }
 
   Future<JournalDaySummary> fetchDaySummary({required String dateKey}) async {
+    await _backend.ensureRunning();
     final response =
         await _apiClient.getJson(
               '/journal/day',
@@ -230,6 +241,7 @@ class JournalRemoteDataSource {
     required String notes,
     required List<String> screenshotRefs,
   }) async {
+    await _backend.ensureRunning();
     final response = await _apiClient.putJson('/api/journals/trades/$tradeId', {
       'setup': setup,
       'mistakes': mistakes,
@@ -274,5 +286,10 @@ class JournalRemoteDataSource {
 
   static String _monthKey(int year, int month) {
     return '$year-${month.toString().padLeft(2, '0')}';
+  }
+
+  void close() {
+    _apiClient.close();
+    _backend.close();
   }
 }

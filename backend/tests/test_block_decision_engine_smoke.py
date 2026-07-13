@@ -12,6 +12,7 @@ sys.path[:0] = [str(ROOT / "backend" / ".deps"), str(ROOT / "backend")]
 
 from app.application.block_decision_engine import BlockDecisionEngine
 from app.domain.services.rule_engine import RuleEvaluationResult
+from app.domain.state_machine.block_state_machine import BlockStateMachine
 
 
 class FakeBlockRepository:
@@ -26,6 +27,7 @@ class FakeBlockRepository:
 def build_engine() -> BlockDecisionEngine:
     engine = BlockDecisionEngine.__new__(BlockDecisionEngine)
     engine._repo = FakeBlockRepository()
+    engine._state_machine = BlockStateMachine()
     return engine
 
 

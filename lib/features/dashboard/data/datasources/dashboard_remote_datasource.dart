@@ -1,20 +1,27 @@
 import '../../../../app/services/api/api_client.dart';
+import '../../../../app/services/backend/backend_process_service.dart';
 import '../../../../app/state/active_account_session.dart';
 import '../../domain/entities/dashboard_period.dart';
 import '../../presentation/models/dashboard_mt5_snapshot.dart';
 
 class DashboardRemoteDataSource {
   final ApiClient _apiClient;
+  final BackendProcessService _backend;
   final int? accountIdOverride;
 
-  DashboardRemoteDataSource({ApiClient? apiClient, this.accountIdOverride})
-    : _apiClient = apiClient ?? ApiClient();
+  DashboardRemoteDataSource({
+    ApiClient? apiClient,
+    BackendProcessService? backend,
+    this.accountIdOverride,
+  }) : _apiClient = apiClient ?? ApiClient(),
+       _backend = backend ?? BackendProcessService();
 
   int get accountId => accountIdOverride ?? ActiveAccountSession.accountId;
 
   Future<DashboardApiView> getDashboard({
     DashboardPeriod period = DashboardPeriod.day,
   }) async {
+    await _backend.ensureRunning();
     final response = await _apiClient.getJson(
       '/api/dashboard',
       queryParameters: {
@@ -30,6 +37,7 @@ class DashboardRemoteDataSource {
   }
 
   Future<List<DashboardRecentTrade>> getAllTrades() async {
+    await _backend.ensureRunning();
     final response = await _apiClient.getJson(
       '/api/trades',
       queryParameters: {'account_id': accountId.toString()},
@@ -53,6 +61,7 @@ class DashboardRemoteDataSource {
   }
 
   Future<DashboardGuardrailStatus> getGuardrailStatus() async {
+    await _backend.ensureRunning();
     final response = await _apiClient.getJson(
       '/api/guardrails/status',
       queryParameters: {'account_id': accountId.toString()},
@@ -64,5 +73,6 @@ class DashboardRemoteDataSource {
 
   void close() {
     _apiClient.close();
+    _backend.close();
   }
 }

@@ -24,30 +24,30 @@ and the first normalized trade sync path:
 
 ```text
 backend/
-├── app/
-│   ├── main.py
-│   ├── core/
-│   │   └── config.py
-│   ├── db/
-│   │   ├── database.py
-│   │   └── models.py
-│   ├── api/
-│   │   ├── health.py
-│   │   ├── accounts.py
-│   │   ├── mt5.py
-│   │   ├── trades.py
-│   │   └── analytics.py
-│   ├── services/
-│   │   ├── mt5_service.py
-│   │   ├── normalization_service.py
-│   │   └── analytics_service.py
-│   └── schemas/
-│       ├── account.py
-│       ├── mt5.py
-│       └── trade.py
-├── data/
-├── requirements.txt
-└── README.md
+|-- app/
+|   |-- main.py
+|   |-- core/
+|   |   `-- config.py
+|   |-- db/
+|   |   |-- database.py
+|   |   `-- models.py
+|   |-- api/
+|   |   |-- health.py
+|   |   |-- accounts.py
+|   |   |-- mt5.py
+|   |   |-- trades.py
+|   |   `-- analytics.py
+|   |-- services/
+|   |   |-- mt5_service.py
+|   |   |-- normalize_service.py
+|   |   `-- analytics_service.py
+|   `-- schemas/
+|       |-- account.py
+|       |-- mt5.py
+|       `-- trade.py
+|-- data/
+|-- requirements.txt
+`-- README.md
 ```
 
 Analytics now reads from `normalized_trades`, not directly from raw MT5 tables.

@@ -3,7 +3,10 @@ import 'router/app_router.dart';
 import 'theme/app_theme.dart';
 
 class TradingDeskApp extends StatelessWidget {
-  const TradingDeskApp({super.key});
+  final Widget? home;
+
+  const TradingDeskApp({super.key}) : home = null;
+  const TradingDeskApp.withHome({super.key, required this.home});
 
   @override
   Widget build(BuildContext context) {
@@ -12,7 +15,7 @@ class TradingDeskApp extends StatelessWidget {
       title: 'Trading Desk',
       themeMode: ThemeMode.light,
       theme: buildAppTheme(),
-      home: const AppRouter(),
+      home: home ?? const AppRouter(),
     );
   }
 }

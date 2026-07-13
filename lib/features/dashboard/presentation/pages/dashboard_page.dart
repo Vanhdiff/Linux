@@ -74,7 +74,8 @@ class _DashboardPageState extends State<DashboardPage> {
       if (!mounted) return;
       setState(() {
         _isLoading = false;
-        _errorMessage = 'Backend unavailable: $error';
+        _errorMessage =
+            'Trading service is starting. Refresh if data does not appear shortly.';
       });
     }
   }
@@ -430,10 +431,14 @@ class _BlockStatusBanner extends StatelessWidget {
       width: double.infinity,
       padding: EdgeInsets.symmetric(horizontal: 14, vertical: 10),
       decoration: BoxDecoration(
-        color: (isFullDay ? AppColors.danger : AppColors.warning).withValues(alpha: 0.10),
+        color: (isFullDay ? AppColors.danger : AppColors.warning).withValues(
+          alpha: 0.10,
+        ),
         borderRadius: BorderRadius.circular(10),
         border: Border.all(
-          color: (isFullDay ? AppColors.danger : AppColors.warning).withValues(alpha: 0.20),
+          color: (isFullDay ? AppColors.danger : AppColors.warning).withValues(
+            alpha: 0.20,
+          ),
         ),
       ),
       child: Row(
@@ -449,7 +454,9 @@ class _BlockStatusBanner extends StatelessWidget {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  isFullDay ? 'Trading blocked for the day' : 'Trading blocked temporarily',
+                  isFullDay
+                      ? 'Trading blocked for the day'
+                      : 'Trading blocked temporarily',
                   style: TextStyle(
                     fontSize: 13,
                     fontWeight: FontWeight.w700,
@@ -458,11 +465,12 @@ class _BlockStatusBanner extends StatelessWidget {
                 ),
                 SizedBox(height: 2),
                 Text(
-                  '$triggerInfo — $countdown',
+                  '$triggerInfo - $countdown',
                   style: TextStyle(
                     fontSize: 11,
                     fontWeight: FontWeight.w500,
-                    color: (isFullDay ? AppColors.danger : AppColors.warning).withValues(alpha: 0.8),
+                    color: (isFullDay ? AppColors.danger : AppColors.warning)
+                        .withValues(alpha: 0.8),
                   ),
                 ),
               ],

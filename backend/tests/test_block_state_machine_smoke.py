@@ -39,6 +39,7 @@ def test_determine_state_without_existing_block() -> None:
 
     assert machine.determine_state([]) == BlockStateEnum.NORMAL
     assert machine.determine_state(["non_blocking_warning"]) == BlockStateEnum.WARNING
+    assert machine.determine_state(["risk_too_high"]) == BlockStateEnum.TEMPORARY_BLOCK
     assert machine.determine_state(["too_many_trades_today"]) == BlockStateEnum.FULL_DAY_BLOCK
     assert machine.determine_state(["max_daily_loss_reached"]) == BlockStateEnum.FULL_DAY_BLOCK
 

@@ -4,7 +4,7 @@ import '../../../../app/i18n/app_localization.dart';
 import '../../../../app/services/api/api_client.dart';
 import '../../../../app/state/active_account_session.dart';
 import '../../../../app/theme/app_colors.dart';
-import '../data/notebook_sample_data.dart';
+import '../../data/catalog/notebook_template_catalog.dart';
 import '../widgets/notebook_sidebar.dart';
 import '../widgets/notebook_templates_board.dart';
 
@@ -27,7 +27,7 @@ class _NotebookPageState extends State<NotebookPage> {
   @override
   void initState() {
     super.initState();
-    _templates = NotebookSampleData.templates;
+    _templates = NotebookTemplateCatalog.templates;
     _templateCategories = _orderedTemplateCategories(_templates);
     _entries = [_newBlankEntry()];
     _selectedTemplateTitle = _entries.first.template;
@@ -356,7 +356,7 @@ class _NotebookPageState extends State<NotebookPage> {
         _selectedTemplateTitle = _entries.first.template;
       });
     } catch (_) {
-      // Keep in-memory sample notes when backend is unavailable.
+      // Keep local starter notes visible while the trading service warms up.
     }
   }
 }

@@ -2,7 +2,7 @@ import 'package:fluent_ui/fluent_ui.dart';
 
 import '../../../../app/i18n/app_localization.dart';
 import '../../../../app/theme/app_colors.dart';
-import '../data/news_sample_data.dart';
+import '../../data/defaults/news_fallback_data.dart';
 
 class NewsCalendarPanel extends StatelessWidget {
   final List<CalendarDayData> days;

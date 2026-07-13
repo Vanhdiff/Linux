@@ -1,6 +1,7 @@
 import '../../../../app/services/api/api_client.dart';
+import '../../../../app/services/backend/backend_process_service.dart';
 import '../../../../app/theme/app_colors.dart';
-import '../../presentation/data/news_sample_data.dart';
+import '../defaults/news_fallback_data.dart';
 
 class NewsRemoteDataSource {
   static const _watchlistCurrencies = [
@@ -15,11 +16,14 @@ class NewsRemoteDataSource {
   ];
 
   final ApiClient _apiClient;
+  final BackendProcessService _backend;
 
-  NewsRemoteDataSource({ApiClient? apiClient})
-    : _apiClient = apiClient ?? ApiClient();
+  NewsRemoteDataSource({ApiClient? apiClient, BackendProcessService? backend})
+    : _apiClient = apiClient ?? ApiClient(),
+      _backend = backend ?? BackendProcessService();
 
   Future<void> importForexFactory() async {
+    await _backend.ensureRunning();
     await _apiClient.postJson('/ingest/news/forexfactory', {
       'weeks': ['this'],
     });
@@ -29,6 +33,7 @@ class NewsRemoteDataSource {
     required String startDate,
     required String endDate,
   }) async {
+    await _backend.ensureRunning();
     await _apiClient.postJson('/ingest/news/tradingview', {
       'start': startDate,
       'end': endDate,
@@ -41,6 +46,7 @@ class NewsRemoteDataSource {
     required String startDate,
     required String endDate,
   }) async {
+    await _backend.ensureRunning();
     final response =
         await _apiClient.getJson(
               '/news/range',
@@ -66,6 +72,7 @@ class NewsRemoteDataSource {
     required int year,
     required int month,
   }) async {
+    await _backend.ensureRunning();
     final monthKey = '$year-${month.toString().padLeft(2, '0')}';
     final response =
         await _apiClient.getJson(
@@ -88,6 +95,7 @@ class NewsRemoteDataSource {
   }
 
   Future<List<NewsEventData>> fetchDayEvents({required String dateKey}) async {
+    await _backend.ensureRunning();
     final response =
         await _apiClient.getJson(
               '/news/day',
@@ -191,5 +199,10 @@ class NewsRemoteDataSource {
     final month = value.month.toString().padLeft(2, '0');
     final day = value.day.toString().padLeft(2, '0');
     return '${value.year}-$month-$day';
+  }
+
+  void close() {
+    _apiClient.close();
+    _backend.close();
   }
 }

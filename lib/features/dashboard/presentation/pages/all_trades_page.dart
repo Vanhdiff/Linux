@@ -49,7 +49,8 @@ class _AllTradesPageState extends State<AllTradesPage> {
       if (!mounted) return;
       setState(() {
         _isLoading = false;
-        _errorMessage = 'Backend unavailable: $error';
+        _errorMessage =
+            'Trading service is starting. Refresh if the trade list does not appear shortly.';
       });
     }
   }

@@ -15,6 +15,7 @@ class AccountCreate(AccountBase):
 
 class AccountRead(AccountBase):
     id: int
+    is_active: bool = False
 
     model_config = {"from_attributes": True}
 

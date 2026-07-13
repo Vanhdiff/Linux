@@ -2,7 +2,7 @@ import 'package:fluent_ui/fluent_ui.dart';
 
 import '../../../../app/i18n/app_localization.dart';
 import '../../data/datasources/news_remote_datasource.dart';
-import '../data/news_sample_data.dart';
+import '../../data/defaults/news_fallback_data.dart';
 import '../widgets/news_calendar_panel.dart';
 import '../widgets/news_events_panel.dart';
 import '../widgets/news_header.dart';
@@ -36,6 +36,12 @@ class _NewsPageState extends State<NewsPage> {
     _selectedDateKey = _dateKey(now);
     _selectedDayTitle = _dayTitle(now);
     _loadNews();
+  }
+
+  @override
+  void dispose() {
+    _remoteDataSource.close();
+    super.dispose();
   }
 
   @override
