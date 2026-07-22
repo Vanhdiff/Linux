@@ -93,6 +93,42 @@ def test_calculate_expiry_and_create_block_state() -> None:
     assert block.expires_at is not None
 
 
+def test_risk_too_high_uses_15_minute_temporary_block() -> None:
+    machine = BlockStateMachine()
+    before = datetime.now(timezone.utc)
+
+    expiry = machine.calculate_expiry(
+        BlockStateEnum.TEMPORARY_BLOCK,
+        triggered_by=["risk_too_high"],
+    )
+    block = machine.create_block_state(
+        account_id=3,
+        state=BlockStateEnum.TEMPORARY_BLOCK,
+        triggered_by=["risk_too_high"],
+    )
+
+    assert expiry is not None
+    assert expiry >= before + timedelta(minutes=14)
+    assert expiry <= before + timedelta(minutes=16)
+    assert block.expires_at is not None
+    assert block.expires_at >= before + timedelta(minutes=14)
+    assert block.expires_at <= before + timedelta(minutes=16)
+
+
+def test_other_temporary_rules_also_use_15_minute_duration() -> None:
+    machine = BlockStateMachine()
+    before = datetime.now(timezone.utc)
+
+    expiry = machine.calculate_expiry(
+        BlockStateEnum.TEMPORARY_BLOCK,
+        triggered_by=["cooling_off_active"],
+    )
+
+    assert expiry is not None
+    assert expiry >= before + timedelta(minutes=14)
+    assert expiry <= before + timedelta(minutes=16)
+
+
 def test_create_block_state_rejects_non_blocking_states() -> None:
     machine = BlockStateMachine()
 
@@ -132,6 +168,8 @@ if __name__ == "__main__":
     test_existing_expired_block_resolves()
     test_terminal_existing_state_is_preserved()
     test_calculate_expiry_and_create_block_state()
+    test_risk_too_high_uses_15_minute_temporary_block()
+    test_other_temporary_rules_also_use_15_minute_duration()
     test_create_block_state_rejects_non_blocking_states()
     test_transition_validation_and_blocking_helpers()
     print("test_block_state_machine_smoke: PASS")

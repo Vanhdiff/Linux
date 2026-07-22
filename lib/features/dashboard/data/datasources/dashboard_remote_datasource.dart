@@ -20,13 +20,14 @@ class DashboardRemoteDataSource {
 
   Future<DashboardApiView> getDashboard({
     DashboardPeriod period = DashboardPeriod.day,
+    bool refreshMt5 = false,
   }) async {
     await _backend.ensureRunning();
     final response = await _apiClient.getJson(
       '/api/dashboard',
       queryParameters: {
         'account_id': accountId.toString(),
-        'refresh_mt5': 'true',
+        'refresh_mt5': refreshMt5.toString(),
         'history_days': period.historyDays.toString(),
         'period': period.apiValue,
       },
@@ -67,6 +68,17 @@ class DashboardRemoteDataSource {
       queryParameters: {'account_id': accountId.toString()},
     );
     return DashboardGuardrailStatus.fromJson(
+      Map<String, dynamic>.from(response as Map),
+    );
+  }
+
+  Future<DashboardLiveState> getLiveState() async {
+    await _backend.ensureRunning();
+    final response = await _apiClient.getJson(
+      '/api/dashboard/live-state',
+      queryParameters: {'account_id': accountId.toString()},
+    );
+    return DashboardLiveState.fromJson(
       Map<String, dynamic>.from(response as Map),
     );
   }

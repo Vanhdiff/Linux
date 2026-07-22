@@ -1,5 +1,6 @@
 import 'package:fluent_ui/fluent_ui.dart';
 
+import '../../../../app/i18n/app_localization.dart';
 import '../../../../app/services/api/api_config.dart';
 import '../../../../app/theme/app_colors.dart';
 import 'guardrails_mt5_setup_support.dart';
@@ -43,6 +44,7 @@ class GuardrailsEaInstallCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final strings = AppLocalization.of(context);
     final terminalCount = (status?['terminal_count'] as num?)?.toInt() ?? 0;
     final installedCount = (status?['installed_count'] as num?)?.toInt() ?? 0;
     final compiledCount = (status?['compiled_count'] as num?)?.toInt() ?? 0;
@@ -59,21 +61,33 @@ class GuardrailsEaInstallCard extends StatelessWidget {
     final headline =
         setupState?['headline']?.toString() ??
         (ready
-            ? 'Protection is connected'
+            ? (strings.isVietnamese
+                ? 'Bao ve da ket noi'
+                : 'Protection is connected')
             : (terminalCount > 0
-                  ? 'Connect MT5 protection'
-                  : 'Open MT5 to start'));
+                  ? (strings.isVietnamese
+                      ? 'Ket noi bao ve voi MT5'
+                      : 'Connect MT5 protection')
+                  : (strings.isVietnamese
+                      ? 'Mo MT5 de bat dau'
+                      : 'Open MT5 to start')));
     final detail =
         setupState?['detail']?.toString() ??
         (sourceExists
-            ? '$installedCount/$terminalCount EA installed, $compiledCount/$terminalCount compiled.'
-            : 'EA file is missing from the app package.');
+            ? (strings.isVietnamese
+                ? 'Da cai $installedCount/$terminalCount EA, da compile $compiledCount/$terminalCount.'
+                : '$installedCount/$terminalCount EA installed, $compiledCount/$terminalCount compiled.')
+            : (strings.isVietnamese
+                ? 'Khong tim thay file EA trong bo cai cua app.'
+                : 'EA file is missing from the app package.'));
     final canRunOneClick =
         setupState?['can_run_one_click'] as bool? ??
         (sourceExists && terminalCount > 0);
     final primaryAction =
         setupState?['primary_action']?.toString() ??
-        (canRunOneClick ? 'Run one-click setup' : 'Review setup');
+        (canRunOneClick
+            ? (strings.isVietnamese ? 'Thiet lap 1 lan bam' : 'Run one-click setup')
+            : (strings.isVietnamese ? 'Xem huong dan' : 'Review setup'));
     final waitingForMt5 = setupCode == 'attach_ea' || setupCode == 'heartbeat_pending';
     final showInstall = terminalCount > 0 && sourceExists && installedCount == 0;
     final showCompile =
@@ -97,6 +111,7 @@ class GuardrailsEaInstallCard extends StatelessWidget {
       sourceExists: sourceExists,
       compiledCount: compiledCount,
       protectionLevel: protectionStatus?['level'] as String?,
+      isVietnamese: strings.isVietnamese,
     );
     final showPrimaryAction = !ready && canRunOneClick;
 
@@ -151,7 +166,9 @@ class GuardrailsEaInstallCard extends StatelessWidget {
               ),
               const SizedBox(width: 8),
               GuardrailsOutlineAction(
-                label: showDetails ? 'Hide details' : 'Show details',
+                label: showDetails
+                    ? (strings.isVietnamese ? 'An chi tiet' : 'Hide details')
+                    : (strings.isVietnamese ? 'Xem chi tiet' : 'Show details'),
                 onTap: onToggleDetails,
               ),
             ],
@@ -169,11 +186,15 @@ class GuardrailsEaInstallCard extends StatelessWidget {
             children: [
               if (showPrimaryAction)
                 GuardrailsPrimaryAction(
-                  label: repairing ? 'Running setup...' : primaryAction,
+                  label: repairing
+                      ? (strings.isVietnamese ? 'Dang thiet lap...' : 'Running setup...')
+                      : primaryAction,
                   onTap: busy || !canRunOneClick ? null : onRepair,
                 ),
               GuardrailsOutlineAction(
-                label: setupCode == 'ready' ? 'Refresh' : 'Check again',
+                label: setupCode == 'ready'
+                    ? (strings.isVietnamese ? 'Lam moi' : 'Refresh')
+                    : (strings.isVietnamese ? 'Kiem tra lai' : 'Check again'),
                 onTap: busy ? null : onRefresh,
               ),
             ],
@@ -191,13 +212,15 @@ class GuardrailsEaInstallCard extends StatelessWidget {
             if (setupCode != null) ...[
               const SizedBox(height: 10),
               _SetupStepBadge(
-                label: _stepLabel(setupCode),
+                label: _stepLabel(setupCode, strings.isVietnamese),
                 color: color,
               ),
             ],
             const SizedBox(height: 10),
             GuardrailsNextStepPanel(
-              title: ready ? 'Ready' : 'What to do next',
+              title: ready
+                  ? (strings.isVietnamese ? 'San sang' : 'Ready')
+                  : (strings.isVietnamese ? 'Buoc tiep theo' : 'What to do next'),
               steps: _buildNextSteps(
                 terminalCount: terminalCount,
                 sourceExists: sourceExists,
@@ -209,6 +232,7 @@ class GuardrailsEaInstallCard extends StatelessWidget {
                 protectionLevel: protectionStatus?['level'] as String?,
                 setupCode: setupCode,
                 setupDetail: setupState?['detail']?.toString(),
+                isVietnamese: strings.isVietnamese,
               ),
               ready: ready,
             ),
@@ -218,27 +242,31 @@ class GuardrailsEaInstallCard extends StatelessWidget {
               runSpacing: 8,
               children: [
                 GuardrailsOutlineAction(
-                  label: 'Copy diagnostics',
+                  label: strings.isVietnamese ? 'Sao chep chan doan' : 'Copy diagnostics',
                   onTap: busy ? null : onCopyReport,
                 ),
                 if (showInstall)
                   GuardrailsOutlineAction(
-                    label: installing ? 'Installing...' : 'Install EA',
+                    label: installing
+                        ? (strings.isVietnamese ? 'Dang cai...' : 'Installing...')
+                        : (strings.isVietnamese ? 'Cai EA' : 'Install EA'),
                     onTap: busy ? null : onInstall,
                   ),
                 if (showCompile)
                   GuardrailsOutlineAction(
-                    label: compiling ? 'Compiling...' : 'Compile',
+                    label: compiling
+                        ? (strings.isVietnamese ? 'Dang compile...' : 'Compiling...')
+                        : (strings.isVietnamese ? 'Compile' : 'Compile'),
                     onTap: busy ? null : onCompile,
                   ),
                 if (showOpenFolder)
                   GuardrailsOutlineAction(
-                    label: 'Open MT5 folder',
+                    label: strings.isVietnamese ? 'Mo thu muc MT5' : 'Open MT5 folder',
                     onTap: busy ? null : onOpenExperts,
                   ),
                 if (showCopyUrl)
                   GuardrailsOutlineAction(
-                    label: 'Copy URL',
+                    label: strings.isVietnamese ? 'Sao chep URL' : 'Copy URL',
                     onTap: busy ? null : onCopyBackendUrl,
                   ),
               ],
@@ -246,7 +274,9 @@ class GuardrailsEaInstallCard extends StatelessWidget {
             if (showAdvanced) ...[
               const SizedBox(height: 8),
               Text(
-                'Technical tools appear only when they can help with the current step.',
+                strings.isVietnamese
+                    ? 'Chi hien cong cu ky thuat khi no thuc su can cho buoc hien tai.'
+                    : 'Technical tools appear only when they can help with the current step.',
                 style: TextStyle(
                   color: AppColors.textSecondary,
                   fontSize: 10,
@@ -270,58 +300,87 @@ class GuardrailsEaInstallCard extends StatelessWidget {
     required bool sourceExists,
     required int compiledCount,
     required String? protectionLevel,
+    required bool isVietnamese,
   }) {
     if (ready) {
-      return 'MT5, EA heartbeat, and backend protection are all ready.';
+      return isVietnamese
+          ? 'MT5, EA va he thong bao ve da san sang.'
+          : 'MT5, EA heartbeat, and backend protection are all ready.';
     }
     if (setupDetail != null && setupDetail.trim().isNotEmpty) {
       return setupDetail.trim();
     }
     if (terminalCount == 0) {
-      return 'Open MetaTrader 5 so TradingDesk can detect your terminal.';
+      return isVietnamese
+          ? 'Hay mo MetaTrader 5 de app nhan dien duoc terminal cua ban.'
+          : 'Open MetaTrader 5 so TradingDesk can detect your terminal.';
     }
     if (!sourceExists) {
-      return 'The EA source file is missing from the app package.';
+      return isVietnamese
+          ? 'Khong tim thay file nguon EA trong bo cai cua app.'
+          : 'The EA source file is missing from the app package.';
     }
     if (compiledCount == 0) {
-      return 'Run one-click setup to copy and compile TradingDeskGuardEA.';
+      return isVietnamese
+          ? 'Hay chay thiet lap 1 lan bam de copy va compile TradingDeskGuardEA.'
+          : 'Run one-click setup to copy and compile TradingDeskGuardEA.';
     }
     if (!heartbeatOk) {
-      return 'Attach TradingDeskGuardEA to one chart, then enable Algo Trading. WebRequest is only needed for pre-trade validation at $backendUrl.';
+      return isVietnamese
+          ? 'Gan TradingDeskGuardEA vao 1 chart, sau do bat Algo Trading. WebRequest chi can neu ban dung kiem tra truoc khi vao lenh tai $backendUrl.'
+          : 'Attach TradingDeskGuardEA to one chart, then enable Algo Trading. WebRequest is only needed for pre-trade validation at $backendUrl.';
     }
     if ((protectionLevel ?? '').toUpperCase() != 'FULL') {
-      return 'MT5 is connected. TradingDesk is still finishing the final protection checks.';
+      return isVietnamese
+          ? 'MT5 da ket noi. TradingDesk dang hoan tat nhung buoc kiem tra cuoi.'
+          : 'MT5 is connected. TradingDesk is still finishing the final protection checks.';
     }
     if (setupCode == 'ready') {
-      return 'Protection is connected and ready.';
+      return isVietnamese
+          ? 'Bao ve da ket noi va san sang.'
+          : 'Protection is connected and ready.';
     }
-    return 'Refresh after MT5 updates to continue the setup flow.';
+    return isVietnamese
+        ? 'Lam moi sau khi MT5 cap nhat de tiep tuc qua trinh thiet lap.'
+        : 'Refresh after MT5 updates to continue the setup flow.';
   }
 
-  static String _stepLabel(String code) {
+  static String _stepLabel(String code, bool isVietnamese) {
     switch (code) {
       case 'open_mt5':
-        return 'Step 1: Open MT5';
+        return isVietnamese ? 'Buoc 1: Mo MT5' : 'Step 1: Open MT5';
       case 'missing_ea_source':
-        return 'Step 1: Restore EA package';
+        return isVietnamese
+            ? 'Buoc 1: Khoi phuc goi EA'
+            : 'Step 1: Restore EA package';
       case 'install_required':
-        return 'Step 2: Copy EA to MT5';
+        return isVietnamese ? 'Buoc 2: Copy EA vao MT5' : 'Step 2: Copy EA to MT5';
       case 'compile_required':
-        return 'Step 3: Compile EA';
+        return isVietnamese ? 'Buoc 3: Compile EA' : 'Step 3: Compile EA';
       case 'config_required':
-        return 'Step 4: Write runtime config';
+        return isVietnamese
+            ? 'Buoc 4: Ghi cau hinh chay'
+            : 'Step 4: Write runtime config';
       case 'attach_ea':
-        return 'Step 5: Attach EA to chart';
+        return isVietnamese
+            ? 'Buoc 5: Gan EA vao chart'
+            : 'Step 5: Attach EA to chart';
       case 'heartbeat_pending':
-        return 'Step 6: Enable Algo Trading';
+        return isVietnamese
+            ? 'Buoc 6: Bat Algo Trading'
+            : 'Step 6: Enable Algo Trading';
       case 'backend_waiting':
-        return 'Step 7: Wait for backend protection';
+        return isVietnamese
+            ? 'Buoc 7: Cho he thong bao ve ket noi'
+            : 'Step 7: Wait for protection';
       case 'protection_syncing':
-        return 'Step 8: Verify protection';
+        return isVietnamese
+            ? 'Buoc 8: Xac nhan bao ve'
+            : 'Step 8: Verify protection';
       case 'ready':
-        return 'Protection ready';
+        return isVietnamese ? 'Bao ve san sang' : 'Protection ready';
       default:
-        return 'Setup step';
+        return isVietnamese ? 'Buoc thiet lap' : 'Setup step';
     }
   }
 
@@ -334,6 +393,7 @@ class GuardrailsEaInstallCard extends StatelessWidget {
     required bool heartbeatOk,
     required String backendUrl,
     required String? protectionLevel,
+    required bool isVietnamese,
     String? setupCode,
     String? setupDetail,
   }) {
@@ -343,39 +403,67 @@ class GuardrailsEaInstallCard extends StatelessWidget {
       final steps = <String>[setupDetail.trim()];
       if (setupCode == 'heartbeat_pending') {
         steps.add(
-          'For pre-trade validation, allow WebRequest for $backendUrl.',
+          isVietnamese
+              ? 'Neu dung kiem tra truoc khi vao lenh, hay cho phep WebRequest voi $backendUrl.'
+              : 'For pre-trade validation, allow WebRequest for $backendUrl.',
         );
       }
       return steps;
     }
     if (terminalCount == 0) {
-      return const ['Open MetaTrader 5 so TradingDesk can detect it.'];
+      return [
+        isVietnamese
+            ? 'Mo MetaTrader 5 de TradingDesk nhan dien duoc.'
+            : 'Open MetaTrader 5 so TradingDesk can detect it.',
+      ];
     }
     if (!sourceExists) {
-      return const ['Restore TradingDeskGuardEA.mq5 in the app package.'];
+      return [
+        isVietnamese
+            ? 'Khoi phuc file TradingDeskGuardEA.mq5 trong bo cai cua app.'
+            : 'Restore TradingDeskGuardEA.mq5 in the app package.',
+      ];
     }
     if (installedCount == 0) {
-      return const ['Run one-click setup to copy the EA into MT5.'];
+      return [
+        isVietnamese
+            ? 'Chay thiet lap 1 lan bam de copy EA vao MT5.'
+            : 'Run one-click setup to copy the EA into MT5.',
+      ];
     }
     if (compiledCount == 0) {
       return [
         metaeditorExists
-            ? 'Click Compile to generate TradingDeskGuardEA.ex5.'
-            : 'Install MT5 completely, then compile the EA in MetaEditor.',
+            ? (isVietnamese
+                ? 'Bam Compile de tao file TradingDeskGuardEA.ex5.'
+                : 'Click Compile to generate TradingDeskGuardEA.ex5.')
+            : (isVietnamese
+                ? 'Hay cai dat day du MT5, sau do compile EA trong MetaEditor.'
+                : 'Install MT5 completely, then compile the EA in MetaEditor.'),
       ];
     }
     if (!heartbeatOk) {
       return [
-        'Attach TradingDeskGuardEA to one chart and enable Algo Trading.',
-        'For pre-trade validation, allow WebRequest for $backendUrl.',
+        isVietnamese
+            ? 'Gan TradingDeskGuardEA vao 1 chart va bat Algo Trading.'
+            : 'Attach TradingDeskGuardEA to one chart and enable Algo Trading.',
+        isVietnamese
+            ? 'Neu dung kiem tra truoc khi vao lenh, hay cho phep WebRequest voi $backendUrl.'
+            : 'For pre-trade validation, allow WebRequest for $backendUrl.',
       ];
     }
     if ((protectionLevel ?? '').toUpperCase() != 'FULL') {
-      return const [
-        'Keep MT5 open while TradingDesk finishes protection checks.',
+      return [
+        isVietnamese
+            ? 'Giu MT5 mo trong khi TradingDesk hoan tat cac buoc kiem tra bao ve.'
+            : 'Keep MT5 open while TradingDesk finishes protection checks.',
       ];
     }
-    return const ['Trade blocking can now enforce active guardrails.'];
+    return [
+      isVietnamese
+          ? 'Che do chan giao dich gio da co the thuc thi cac gioi han dang bat.'
+          : 'Trade blocking can now enforce active guardrails.',
+    ];
   }
 }
 

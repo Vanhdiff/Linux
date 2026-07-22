@@ -219,6 +219,11 @@ class Mt5DemoHarnessService:
             if latest_block_write
             else None
         )
+        first_block_write = self._first_event(
+            backend_events,
+            "block_file_written",
+            block_key=block_key,
+        )
         rule_detected = self._latest_event(
             backend_events,
             "rule_detected",
@@ -231,7 +236,7 @@ class Mt5DemoHarnessService:
         )
 
         block_file_written_at = _parse_dt(
-            latest_block_write.get("occurred_at") if latest_block_write else None
+            first_block_write.get("occurred_at") if first_block_write else None
         )
         if block_file_written_at is None:
             block_path_value = self._ea_layer.diagnostics(account_id=account_id)["block_file_path"]
@@ -291,6 +296,24 @@ class Mt5DemoHarnessService:
             )
         ]
         return filtered[-1] if filtered else None
+
+    def _first_event(
+        self,
+        events: list[dict[str, Any]],
+        event_type: str,
+        *,
+        block_key: str | None = None,
+    ) -> dict[str, Any] | None:
+        filtered = [
+            item
+            for item in events
+            if item.get("event_type") == event_type
+            and (
+                block_key is None
+                or ((item.get("metadata") or {}).get("block_key") == block_key)
+            )
+        ]
+        return filtered[0] if filtered else None
 
     def _first_event_after(
         self,

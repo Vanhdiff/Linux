@@ -149,11 +149,12 @@ class Mt5SyncService:
             include_orders=True,
             include_deals=True,
         )
-        account = self._db.get(TradingAccount, account_id)
-        if account is None:
+        if self._db.get(TradingAccount, account_id) is None:
             raise HTTPException(status_code=404, detail="Account not found")
 
-        last_deal_time = self._latest_raw_deal_time(account_id)
+        account_info = self._mt5_service.account(base_payload)
+        account = self._upsert_mt5_account(account_info, account_id)
+        last_deal_time = self._latest_raw_deal_time(account.id)
         now = datetime.now(timezone.utc)
         date_from = (
             max(
@@ -166,7 +167,7 @@ class Mt5SyncService:
         date_to = now + timedelta(days=1)
         effective_payload = base_payload.model_copy(
             update={
-                "account_id": account_id,
+                "account_id": account.id,
                 "date_from": date_from,
                 "date_to": date_to,
                 "history_days": history_days,
@@ -176,8 +177,6 @@ class Mt5SyncService:
             }
         )
 
-        account_info = self._mt5_service.account(effective_payload)
-        account = self._upsert_mt5_account(account_info, account_id)
         ingestion = Mt5IngestionService(self._db)
         captured_at = datetime.now(timezone.utc)
         deals_payload = self._mt5_service.history(
@@ -256,6 +255,8 @@ class Mt5SyncService:
         account = self._db.get(TradingAccount, account_id) if account_id is not None else None
         if account_id is not None and account is None:
             raise HTTPException(status_code=404, detail="Account not found")
+        if account is not None and str(account.login) != login:
+            account = None
         if account is None:
             account = (
                 self._db.query(TradingAccount)

@@ -49,13 +49,9 @@ class NormalizationService:
                 continue
             current_source_keys.add(self._source_key(normalized["source_deal_ids"]))
 
-            existing = (
-                self._db.query(NormalizedTrade)
-                .filter(
-                    NormalizedTrade.account_id == account_id,
-                    NormalizedTrade.source_deal_ids == normalized["source_deal_ids"],
-                )
-                .one_or_none()
+            existing = self._existing_normalized_trade(
+                account_id,
+                normalized["source_deal_ids"],
             )
 
             if existing is None:
@@ -77,6 +73,29 @@ class NormalizationService:
             updated=updated,
             skipped=skipped + deleted,
         )
+
+    def _existing_normalized_trade(
+        self,
+        account_id: int,
+        source_deal_ids: list,
+    ) -> NormalizedTrade | None:
+        matches = (
+            self._db.query(NormalizedTrade)
+            .filter(
+                NormalizedTrade.account_id == account_id,
+                NormalizedTrade.source_deal_ids == source_deal_ids,
+            )
+            .order_by(NormalizedTrade.id.desc())
+            .all()
+        )
+        if not matches:
+            return None
+
+        keeper = next((trade for trade in matches if trade.journal is not None), matches[0])
+        for duplicate in matches:
+            if duplicate.id != keeper.id:
+                self._db.delete(duplicate)
+        return keeper
 
     def _delete_stale_normalized_trades(
         self,

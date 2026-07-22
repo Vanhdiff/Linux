@@ -170,7 +170,10 @@ class BlockDecisionEngine:
 
             if state == BlockStateEnum.FULL_DAY_BLOCK and existing_block.is_temporary():
                 existing_block.upgrade_to_full_day(
-                    expires_at=self._state_machine.calculate_expiry(state),
+                    expires_at=self._state_machine.calculate_expiry(
+                        state,
+                        triggered_by=triggered_by,
+                    ),
                     triggered_by=triggered_by,
                 )
                 existing_block.payload["reasons"] = reasons
@@ -179,7 +182,10 @@ class BlockDecisionEngine:
             if state == BlockStateEnum.TEMPORARY_BLOCK and existing_block.is_full_day():
                 return existing_block, "none"
 
-            existing_block.expires_at = self._state_machine.calculate_expiry(state)
+            existing_block.expires_at = self._state_machine.calculate_expiry(
+                state,
+                triggered_by=triggered_by,
+            )
             return existing_block, "refresh"
 
         new_block = self._state_machine.create_block_state(

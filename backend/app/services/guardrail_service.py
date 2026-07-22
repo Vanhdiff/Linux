@@ -610,26 +610,6 @@ class GuardrailService:
             .first()
         )
         if snapshot is None:
-            snapshot = (
-                self._db.query(AccountSnapshot)
-                .join(TradingAccount, TradingAccount.id == AccountSnapshot.account_id)
-                .filter(TradingAccount.is_active.is_(True))
-                .order_by(
-                    AccountSnapshot.captured_at.desc(),
-                    AccountSnapshot.id.desc(),
-                )
-                .first()
-            )
-        if snapshot is None:
-            snapshot = (
-                self._db.query(AccountSnapshot)
-                .order_by(
-                    AccountSnapshot.captured_at.desc(),
-                    AccountSnapshot.id.desc(),
-                )
-                .first()
-            )
-        if snapshot is None:
             return 0
         return self._snapshot_account_value(snapshot)
 

@@ -35,6 +35,7 @@ class Mt5TradeBlocker:
         self._last_incremental_sync_result_by_account: dict[int, dict[str, Any]] = {}
         self._last_reconcile_result_by_account: dict[int, dict[str, Any]] = {}
         self._last_block_audit_key_by_account: dict[int, str] = {}
+        self._last_block_file_written_audit_key_by_account: dict[int, str] = {}
         self._ea_layer = EACommunicationLayer()
         self.last_result: dict[str, Any] = {
             "running": False,
@@ -185,6 +186,7 @@ class Mt5TradeBlocker:
             self._last_incremental_sync_result_by_account.clear()
             self._last_reconcile_result_by_account.clear()
             self._last_block_audit_key_by_account.clear()
+            self._last_block_file_written_audit_key_by_account.clear()
             self.last_result = {
                 "running": False,
                 "accounts": {},
@@ -199,10 +201,32 @@ class Mt5TradeBlocker:
         self._last_incremental_sync_result_by_account.pop(account_id, None)
         self._last_reconcile_result_by_account.pop(account_id, None)
         self._last_block_audit_key_by_account.pop(account_id, None)
+        self._last_block_file_written_audit_key_by_account.pop(account_id, None)
         self.last_result.setdefault("accounts", {}).pop(str(account_id), None)
 
     def _enforce_account(self, db, account_id: int) -> dict[str, Any]:
         started = perf_counter()
+        login_guard = self._current_login_guard(db, account_id)
+        if login_guard is not None:
+            return {
+                "blocked": False,
+                "allowed": False,
+                "trade_blocking_enabled": False,
+                "reasons": [],
+                "floating_pnl": None,
+                "open_position_count": 0,
+                "sync": self._cached_sync_result(account_id),
+                "live_poll": self._cached_live_poll_result(account_id),
+                "reconciliation": self._cached_reconcile_result(account_id),
+                "block_file_sync": {
+                    "attempted": False,
+                    "synced": False,
+                    "reason": login_guard["reason"],
+                },
+                "latency": self._latency_payload(started, positions_ms=0),
+                "mt5_action": None,
+                **login_guard,
+            }
         open_positions, floating_pnl, positions_ms = self._read_positions_fast()
         active_block_status = self._active_block_fast_path(db, account_id)
         if active_block_status is not None:
@@ -262,6 +286,7 @@ class Mt5TradeBlocker:
 
         block_file_sync = self._sync_block_file(db, account_id, blocked=False)
         self._blocked_since_by_account.pop(account_id, None)
+        self._last_block_file_written_audit_key_by_account.pop(account_id, None)
         return {
             "blocked": False,
             "allowed": True,
@@ -293,6 +318,35 @@ class Mt5TradeBlocker:
         except RuntimeError:
             return [], None, int((perf_counter() - started) * 1000)
 
+    def _current_login_guard(self, db, account_id: int) -> dict[str, Any] | None:
+        account = db.get(TradingAccount, account_id)
+        if account is None:
+            return {
+                "reason": "account_not_found",
+                "account_id": account_id,
+                "mt5_login": None,
+                "account_login": None,
+            }
+        try:
+            mt5_account = self._mt5_service.account()
+        except RuntimeError as exc:
+            return {
+                "reason": "mt5_account_unavailable",
+                "account_id": account_id,
+                "account_login": account.login,
+                "mt5_login": None,
+                "error": str(exc),
+            }
+        mt5_login = str(mt5_account.get("login") or "")
+        if mt5_login and str(account.login) != mt5_login:
+            return {
+                "reason": "mt5_login_mismatch",
+                "account_id": account_id,
+                "account_login": account.login,
+                "mt5_login": mt5_login,
+            }
+        return None
+
     def _blocked_response(
         self,
         db,
@@ -319,7 +373,10 @@ class Mt5TradeBlocker:
         )
         block_file_sync = self._sync_block_file(db, account_id, blocked=True)
         block_file_sync_ms = int((perf_counter() - block_file_sync_started) * 1000)
-        if block_file_sync.get("synced"):
+        if block_file_sync.get("synced") and (
+            self._last_block_file_written_audit_key_by_account.get(account_id)
+            != block_key
+        ):
             self._ea_layer.append_backend_timing_event(
                 event_type="block_file_written",
                 account_id=account_id,
@@ -330,6 +387,7 @@ class Mt5TradeBlocker:
                     ),
                 },
             )
+            self._last_block_file_written_audit_key_by_account[account_id] = block_key
         watchdog_started = perf_counter()
         try:
             mt5_action = self._mt5_service.enforce_trade_block(
@@ -535,8 +593,9 @@ class Mt5TradeBlocker:
             )
             for account in accounts:
                 account_result = runner(db, account.id)
-                cache[account.id] = account_result
-                result["accounts"][str(account.id)] = account_result
+                resolved_account_id = account_result.get("account_id") or account.id
+                cache[int(resolved_account_id)] = account_result
+                result["accounts"][str(resolved_account_id)] = account_result
         return result
 
     def _poll_live_account_if_due(self, db, account_id: int) -> dict[str, Any]:

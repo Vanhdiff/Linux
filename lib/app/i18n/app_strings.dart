@@ -65,12 +65,12 @@ class AppStrings {
     'Trading time': 'Thời gian giao dịch',
     'Trading locked around high-impact news.':
         'Giao dịch bị khóa quanh tin quan trọng.',
-    "Today's rule breaks": 'Rule vi phạm hôm nay',
+    "Today's rule breaks": 'Vi phạm hôm nay',
     "A quick summary of today's trading rules and loss status.":
-        'Tóm tắt nhanh trạng thái rule và thua lỗ hôm nay.',
-    'Modify guardrails': 'Sửa guardrails',
+        'Tóm tắt nhanh các vi phạm và trạng thái lãi lỗ hôm nay.',
+    'Modify guardrails': 'Chỉnh giới hạn bảo vệ',
     'Max daily loss is reached.': 'Đã chạm mức lỗ tối đa trong ngày.',
-    'No active rule breaks.': 'Không có rule đang vi phạm.',
+    'No active rule breaks.': 'Không có vi phạm nào đang hoạt động.',
     'Monthly Summary': 'Tổng kết tháng',
     'Weekly Breakdown': 'Phân tích tuần',
     'No weekly PnL synced yet': 'Chưa có PnL tuần được đồng bộ',
@@ -85,7 +85,7 @@ class AppStrings {
         'Đang tải nhật ký, lịch và đánh giá lệnh MT5...',
     'Trade journal connected - notes, reviews, and calendar are synced from broker data.':
         'Nhật ký đã kết nối - ghi chú, đánh giá và lịch được đồng bộ từ dữ liệu broker.',
-    'Connected to backend': 'Đã kết nối backend',
+    'Connected to backend': 'Đã kết nối dịch vụ',
     'Syncing trades from MT5': 'Đang đồng bộ lệnh từ MT5',
     'Profit': 'Lời',
     'Reviewed': 'Đã review',
@@ -95,7 +95,7 @@ class AppStrings {
     'Losses': 'Lệnh thua',
     'Return': 'Lợi suất',
     'Trades': 'Lệnh',
-    'Rule break': 'Vi phạm rule',
+    'Rule break': 'Vi phạm',
     'Templates': 'Mẫu',
     'New Note': 'Ghi chú mới',
     'Create from Template': 'Tạo từ mẫu',
@@ -176,19 +176,19 @@ class AppStrings {
     'Mode': 'Chế độ',
     'MT5 enforcement': 'Thực thi MT5',
     'Mt5 enforcement': 'Thực thi MT5',
-    'Triggered rules': 'Rule đã kích hoạt',
+    'Triggered rules': 'Điều kiện đang kích hoạt',
     'Critical': 'Nghiêm trọng',
     'active': 'đang kích hoạt',
     'critical': 'nghiêm trọng',
-    'critical rule needs attention': 'rule nghiêm trọng cần chú ý',
+    'critical rule needs attention': 'mục nghiêm trọng cần chú ý',
     'Trade blocking rules': 'Quy tắc chặn giao dịch',
-    'Set your Guardrails': 'Thiết lập Guardrails',
+    'Set your Guardrails': 'Thiết lập giới hạn bảo vệ',
     'These are recommended defaults. You can change them later.':
         'Đây là các mặc định được đề xuất. Bạn có thể thay đổi sau.',
     'Guardrails will flag actions that break your rules. Trade blocking stays off until you enable it later.':
-        'Guardrails sẽ đánh dấu hành động vi phạm rule. Chặn giao dịch vẫn tắt cho đến khi bạn bật.',
+        'Hệ thống sẽ đánh dấu các hành động vượt giới hạn. Chế độ chặn giao dịch vẫn tắt cho đến khi bạn chủ động bật.',
     'Guardrails can block app/EA trade execution automatically once enabled.':
-        'Guardrails có thể tự động chặn lệnh app/EA khi được bật.',
+        'Khi được bật, hệ thống có thể tự động chặn lệnh từ app hoặc EA.',
     'Enable trade blocking': 'Bật chặn giao dịch',
     'Blocks new orders when an active limit is reached':
         'Chặn lệnh mới khi một giới hạn đang bị kích hoạt',
@@ -220,22 +220,22 @@ class AppStrings {
         'Chỉ chặn tin đỏ - 15 phút trước và sau - tin vàng vẫn được phép',
     'Blocks red news only · 15 min before & after · yellow allowed':
         'Chỉ chặn tin đỏ · 15 phút trước và sau · tin vàng vẫn được phép',
-    'Live rule checks': 'Kiểm tra rule trực tiếp',
+    'Live rule checks': 'Kiểm tra trực tiếp',
     'Reads local analytics and cached economic news in real time.':
         'Đọc phân tích nội bộ và tin kinh tế đã cache theo thời gian thực.',
     'Reset defaults': 'Đặt lại mặc định',
-    'Save guardrails': 'Lưu guardrails',
+    'Save guardrails': 'Lưu giới hạn',
     'Skip for now': 'Bỏ qua lúc này',
     'Locked': 'Đã khóa',
     'Saving...': 'Đang lưu...',
     'Guardrails saved. MT5 trade blocker will enforce active limits.':
-        'Đã lưu guardrails. Bộ chặn MT5 sẽ thực thi các giới hạn đang kích hoạt.',
+        'Đã lưu giới hạn. MT5 sẽ áp dụng các giới hạn đang bật.',
     'Guardrails saved. Trade blocking is currently off.':
-        'Đã lưu guardrails. Chặn giao dịch hiện đang tắt.',
+        'Đã lưu giới hạn. Chế độ chặn giao dịch hiện đang tắt.',
     'AI Coach': 'AI Coach',
     'AI Coach unavailable': 'AI Coach chưa khả dụng',
     'Journal, guardrails, trades, and news are analyzed from local broker data.':
-        'Journal, guardrails, lệnh giao dịch và tin tức được phân tích từ dữ liệu broker cục bộ.',
+        'Nhật ký, giới hạn bảo vệ, lệnh giao dịch và tin tức được phân tích từ dữ liệu broker cục bộ.',
     'Week': 'Tuần',
     'Month': 'Tháng',
     'Key findings': 'Điểm chính',
@@ -258,7 +258,7 @@ class AppStrings {
     'No forced avoidance': 'Không bắt buộc tránh',
     'Data signals': 'Tín hiệu dữ liệu',
     'Weakest symbols': 'Mã yếu nhất',
-    'Rule breaks': 'Vi phạm rule',
+    'Rule breaks': 'Các vi phạm',
     'No data yet': 'Chưa có dữ liệu',
     'Avg R': 'R trung bình',
     'High risk': 'Rủi ro cao',
@@ -345,9 +345,18 @@ class AppStrings {
   String connectedMt5Message(String login) => isVietnamese
       ? 'Đã kết nối. Đã import và đồng bộ tài khoản MT5 $login.'
       : 'Connected. Imported and synced MT5 account $login.';
-  String couldNotConnect(Object error) => isVietnamese
-      ? 'Không thể kết nối. Mở MT5, đăng nhập, rồi thử lại. $error'
-      : 'Could not connect. Open MT5, log in, then try again. $error';
+  String couldNotConnect(Object error) {
+    final message = error.toString();
+    final lower = message.toLowerCase();
+    if (lower.contains('read-only') || lower.contains('readonly database')) {
+      return isVietnamese
+          ? 'Chua the luu du lieu MT5 vi database dang chi doc. Hay dong app, mo lai TradingDesk, hoac kiem tra quyen ghi cua thu muc TradingDesk trong AppData. $error'
+          : 'Could not save MT5 data because the database is read-only. Close and reopen TradingDesk, or check write permission for the TradingDesk folder in AppData. $error';
+    }
+    return isVietnamese
+        ? 'Khong the ket noi. Hay mo MT5, dang nhap tai khoan, roi thu lai. $error'
+        : 'Could not connect. Open MT5, log in, then try again. $error';
+  }
 
   String get notificationsTitle => isVietnamese ? 'Thông báo' : 'Notifications';
   String get notificationsSubtitle => isVietnamese

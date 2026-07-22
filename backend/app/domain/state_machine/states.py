@@ -12,7 +12,7 @@ class BlockStateEnum(str, Enum):
 
     NORMAL - No active block, trading allowed
     WARNING - Rules triggered but not blocking yet
-    TEMPORARY_BLOCK - Blocked for a duration (e.g., 60 minutes)
+    TEMPORARY_BLOCK - Blocked for a duration (e.g., 15 minutes)
     FULL_DAY_BLOCK - Blocked until next trading day
     RESOLVED - Block ended and has not yet been archived
     ARCHIVED - Historical record no longer active

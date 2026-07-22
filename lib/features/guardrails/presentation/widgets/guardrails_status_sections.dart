@@ -22,43 +22,61 @@ class GuardrailsHeader extends StatelessWidget {
     final summary = status?['summary'] as Map<String, dynamic>? ?? {};
     final critical = (summary['critical_count'] as num?)?.toInt() ?? 0;
 
-    return Row(
-      children: [
-        Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final compact = constraints.maxWidth < 760;
+        return Wrap(
+          alignment: WrapAlignment.spaceBetween,
+          crossAxisAlignment: WrapCrossAlignment.center,
+          runSpacing: 12,
+          spacing: 12,
           children: [
-            Text(
-              strings.text('Account protection'),
-              style: TextStyle(
-                fontSize: 14,
-                fontWeight: FontWeight.w800,
-                color: AppColors.textPrimary,
+            ConstrainedBox(
+              constraints: BoxConstraints(
+                maxWidth: compact ? constraints.maxWidth : 640,
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    strings.text('Account protection'),
+                    style: TextStyle(
+                      fontSize: 19,
+                      fontWeight: FontWeight.w900,
+                      color: AppColors.textPrimary,
+                    ),
+                  ),
+                  const SizedBox(height: 6),
+                  Text(
+                    strings.text(
+                      'Automated limits that keep your trading inside the plan and enforce protection directly on MT5.',
+                    ),
+                    style: TextStyle(
+                      fontSize: 12,
+                      color: AppColors.textSecondary,
+                      fontWeight: FontWeight.w500,
+                    ),
+                  ),
+                ],
               ),
             ),
-            const SizedBox(height: 6),
-            Text(
-              strings.text(
-                'Automated limits that keep your trading inside the plan, enforced directly on MT5.',
-              ),
-              style: TextStyle(
-                fontSize: 12,
-                color: AppColors.textSecondary,
-                fontWeight: FontWeight.w500,
-              ),
+            Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                if (critical > 0)
+                  _AttentionPill(
+                    text: '$critical ${strings.text('critical rule needs attention')}',
+                  ),
+                if (critical > 0) const SizedBox(width: 10),
+                GuardrailsIconAction(
+                  icon: loading ? FluentIcons.sync : FluentIcons.refresh,
+                  onTap: onRefresh,
+                ),
+              ],
             ),
           ],
-        ),
-        const Spacer(),
-        if (critical > 0)
-          _AttentionPill(
-            text: '$critical ${strings.text('critical rule needs attention')}',
-          ),
-        const SizedBox(width: 10),
-        GuardrailsIconAction(
-          icon: loading ? FluentIcons.sync : FluentIcons.refresh,
-          onTap: onRefresh,
-        ),
-      ],
+        );
+      },
     );
   }
 }
@@ -83,48 +101,61 @@ class GuardrailsStatusStrip extends StatelessWidget {
     final blocking = status?['trade_blocking_enabled'] as bool? ?? false;
     final blocked = status?['trade_blocked'] as bool? ?? false;
 
-    return Row(
-      children: [
-        Expanded(
-          child: _StatusCard(
-            icon: FluentIcons.lock,
-            label: strings.text('Trade blocking'),
-            value: blocked
-                ? strings.text('Blocked')
-                : (blocking ? strings.text('Ready') : strings.text('Off')),
-            color: blocked
-                ? AppColors.danger
-                : (blocking ? AppColors.success : AppColors.warning),
-          ),
-        ),
-        const SizedBox(width: 12),
-        Expanded(
-          child: _StatusCard(
-            icon: FluentIcons.shield,
-            label: strings.text('Protection level'),
-            value: strings.text(protectionLevelLabel(protectionLevel)),
-            color: protectionLevelColor(protectionLevel),
-          ),
-        ),
-        const SizedBox(width: 12),
-        Expanded(
-          child: _StatusCard(
-            icon: FluentIcons.warning,
-            label: strings.text('Triggered rules'),
-            value: '$triggered ${strings.text('active')}',
-            color: triggered > 0 ? AppColors.warning : AppColors.success,
-          ),
-        ),
-        const SizedBox(width: 12),
-        Expanded(
-          child: _StatusCard(
-            icon: FluentIcons.error_badge,
-            label: strings.text('Critical'),
-            value: '$critical ${strings.text('critical')}',
-            color: critical > 0 ? AppColors.danger : AppColors.success,
-          ),
-        ),
-      ],
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final cardWidth = constraints.maxWidth < 900
+            ? constraints.maxWidth
+            : (constraints.maxWidth - 12) / 2;
+        final wideCardWidth = constraints.maxWidth >= 1280
+            ? (constraints.maxWidth - 36) / 4
+            : cardWidth;
+        return Wrap(
+          spacing: 12,
+          runSpacing: 12,
+          children: [
+            SizedBox(
+              width: wideCardWidth,
+              child: _StatusCard(
+                icon: FluentIcons.lock,
+                label: strings.text('Trade blocking'),
+                value: blocked
+                    ? strings.text('Blocked')
+                    : (blocking ? strings.text('Ready') : strings.text('Off')),
+                color: blocked
+                    ? AppColors.danger
+                    : (blocking ? AppColors.success : AppColors.warning),
+              ),
+            ),
+            SizedBox(
+              width: wideCardWidth,
+              child: _StatusCard(
+                icon: FluentIcons.shield,
+                label: strings.text('Protection level'),
+                value: strings.text(protectionLevelLabel(protectionLevel)),
+                color: protectionLevelColor(protectionLevel),
+              ),
+            ),
+            SizedBox(
+              width: wideCardWidth,
+              child: _StatusCard(
+                icon: FluentIcons.warning,
+                label: strings.text('Triggered rules'),
+                value: '$triggered ${strings.text('active')}',
+                color: triggered > 0 ? AppColors.warning : AppColors.success,
+              ),
+            ),
+            SizedBox(
+              width: wideCardWidth,
+              child: _StatusCard(
+                icon: FluentIcons.error_badge,
+                label: strings.text('Critical'),
+                value: '$critical ${strings.text('critical')}',
+                color: critical > 0 ? AppColors.danger : AppColors.success,
+              ),
+            ),
+          ],
+        );
+      },
     );
   }
 }
@@ -144,7 +175,7 @@ class GuardrailsPanel extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      padding: const EdgeInsets.fromLTRB(16, 15, 16, 16),
+      padding: const EdgeInsets.fromLTRB(18, 18, 18, 18),
       decoration: BoxDecoration(
         color: AppColors.surface,
         borderRadius: BorderRadius.circular(12),
@@ -157,20 +188,20 @@ class GuardrailsPanel extends StatelessWidget {
             title,
             style: TextStyle(
               color: AppColors.textPrimary,
-              fontSize: 13,
-              fontWeight: FontWeight.w800,
+              fontSize: 16,
+              fontWeight: FontWeight.w900,
             ),
           ),
-          const SizedBox(height: 4),
+          const SizedBox(height: 6),
           Text(
             subtitle,
             style: TextStyle(
               color: AppColors.textSecondary,
-              fontSize: 10,
+              fontSize: 11,
               fontWeight: FontWeight.w500,
             ),
           ),
-          const SizedBox(height: 12),
+          const SizedBox(height: 16),
           child,
         ],
       ),
@@ -212,7 +243,7 @@ class _AttentionPill extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
       decoration: BoxDecoration(
         color: AppColors.warning.withValues(alpha: 0.10),
         borderRadius: BorderRadius.circular(999),
@@ -227,7 +258,7 @@ class _AttentionPill extends StatelessWidget {
             text,
             style: TextStyle(
               color: AppColors.warning,
-              fontSize: 11,
+              fontSize: 10,
               fontWeight: FontWeight.w700,
             ),
           ),
@@ -253,8 +284,8 @@ class _StatusCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      height: 64,
-      padding: const EdgeInsets.symmetric(horizontal: 14),
+      height: 72,
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
       decoration: BoxDecoration(
         color: AppColors.surface,
         borderRadius: BorderRadius.circular(10),
@@ -293,8 +324,8 @@ class _StatusCard extends StatelessWidget {
                   overflow: TextOverflow.ellipsis,
                   style: TextStyle(
                     color: color,
-                    fontSize: 12,
-                    fontWeight: FontWeight.w800,
+                    fontSize: 14,
+                    fontWeight: FontWeight.w900,
                   ),
                 ),
               ],

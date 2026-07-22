@@ -73,6 +73,13 @@ class FakeMt5Service:
         }
 
 
+class MismatchedMt5Service(FakeMt5Service):
+    def account(self, payload=None):
+        data = super().account(payload)
+        data["login"] = "different-live-account"
+        return data
+
+
 class NoopBlocker(Mt5TradeBlocker):
     def _sync_account_if_due(self, db, account_id: int):
         return {"attempted": False, "synced": False, "reason": "test_skip_raw_mt5_sync"}
@@ -170,6 +177,38 @@ def test_blocker_writes_block_file_immediately_when_blocked() -> None:
             assert payload["blocked"] is True
             assert payload["block_type"] == "full_day"
             assert "too_many_trades_today" in payload["triggered_by"]
+    finally:
+        session.close()
+
+
+def test_blocker_skips_enforcement_when_mt5_login_does_not_match_account() -> None:
+    session, account_id = build_session()
+    try:
+        service = GuardrailService(session)
+        service.patch_settings(
+            account_id,
+            GuardrailSettingsPatch(
+                max_trades_per_day=1,
+                settings={"trade_blocking_enabled": True},
+            ),
+        )
+        add_closed_trade(session, account_id)
+        with tempfile.TemporaryDirectory() as tmp:
+            blocker = NoopBlocker(
+                mt5_service=MismatchedMt5Service(),
+                poll_seconds=0.05,
+            )
+            blocker._ea_layer = EACommunicationLayer(Path(tmp))
+
+            result = blocker._enforce_account(session, account_id)
+
+            assert result["blocked"] is False
+            assert result["allowed"] is False
+            assert result["reason"] == "mt5_login_mismatch"
+            assert result["account_login"] == "realtime-blocker"
+            assert result["mt5_login"] == "different-live-account"
+            assert result["block_file_sync"]["attempted"] is False
+            assert not (Path(tmp) / f"block_{account_id}.json").exists()
     finally:
         session.close()
 
@@ -344,6 +383,7 @@ def test_incremental_sync_survives_database_contention() -> None:
 
 if __name__ == "__main__":
     test_blocker_writes_block_file_immediately_when_blocked()
+    test_blocker_skips_enforcement_when_mt5_login_does_not_match_account()
     test_blocked_fast_path_skips_raw_sync_and_reports_under_target()
     test_existing_active_block_uses_fast_path_without_full_rule_recompute()
     test_blocker_clears_block_file_when_not_blocked()

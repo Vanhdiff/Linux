@@ -1,5 +1,6 @@
 import 'package:fluent_ui/fluent_ui.dart';
 
+import '../../../../app/i18n/app_localization.dart';
 import '../../../../app/theme/app_colors.dart';
 import 'guardrails_surface_widgets.dart';
 
@@ -27,7 +28,8 @@ class GuardrailsFullProtectionFlowCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final steps = _buildSteps();
+    final strings = AppLocalization.of(context);
+    final steps = _buildSteps(strings.isVietnamese);
     final completed = steps.where((step) => step.done).length;
     final total = steps.length;
     final full = completed == total;
@@ -64,7 +66,13 @@ class GuardrailsFullProtectionFlowCard extends StatelessWidget {
               const SizedBox(width: 8),
               Expanded(
                 child: Text(
-                  full ? 'Protection is fully verified' : 'Protection setup',
+                  full
+                      ? (strings.isVietnamese
+                          ? 'Bao ve da san sang'
+                          : 'Protection is ready')
+                      : (strings.isVietnamese
+                          ? 'Ket noi bao ve MT5'
+                          : 'Connect MT5 protection'),
                   style: TextStyle(
                     color: color,
                     fontSize: 15,
@@ -86,10 +94,14 @@ class GuardrailsFullProtectionFlowCard extends StatelessWidget {
           const SizedBox(height: 6),
           Text(
             full
-                ? 'MT5, heartbeat, blocker, and demo evidence are all ready.'
+                ? (strings.isVietnamese
+                    ? 'MT5, EA va che do bao ve da ket noi day du.'
+                    : 'MT5, EA, and protection are all connected.')
                 : (setupHeadline != null && setupDetail != null
                       ? '$setupHeadline. $setupDetail'
-                      : '$completed/$total ready. Next: ${next?.help ?? 'refresh after MT5 updates.'}'),
+                      : strings.isVietnamese
+                          ? '$completed/$total muc da xong. Tiep theo: ${next?.help ?? 'lam moi sau khi MT5 cap nhat.'}'
+                          : '$completed/$total steps ready. Next: ${next?.help ?? 'refresh after MT5 updates.'}'),
             style: TextStyle(
               color: AppColors.textSecondary,
               fontSize: 11,
@@ -104,7 +116,10 @@ class GuardrailsFullProtectionFlowCard extends StatelessWidget {
               _VerificationPill(label: 'MT5 EA', done: mt5Ready),
               _VerificationPill(label: 'Heartbeat', done: heartbeatLive),
               _VerificationPill(label: 'Blocker', done: blockingReady),
-              _VerificationPill(label: 'Demo proof', done: demoReady),
+              _VerificationPill(
+                label: strings.isVietnamese ? 'Kiem thu demo' : 'Demo proof',
+                done: demoReady,
+              ),
             ],
           ),
         ],
@@ -112,7 +127,7 @@ class GuardrailsFullProtectionFlowCard extends StatelessWidget {
     );
   }
 
-  List<_VerificationStep> _buildSteps() {
+  List<_VerificationStep> _buildSteps(bool isVietnamese) {
     final terminalCount =
         (installerStatus?['terminal_count'] as num?)?.toInt() ?? 0;
     final installedCount =
@@ -145,12 +160,16 @@ class GuardrailsFullProtectionFlowCard extends StatelessWidget {
       _VerificationStep(
         title: 'Backend status loaded',
         done: guardrailStatus != null,
-        help: 'Start backend and refresh Guardrails.',
+        help: isVietnamese
+            ? 'Mo app va bam lam moi de tai trang thai moi nhat.'
+            : 'Start the service and refresh Guardrails.',
       ),
       _VerificationStep(
         title: 'Trade blocking enabled',
         done: tradeBlockingEnabled,
-        help: 'Enable trade blocking and save guardrails.',
+        help: isVietnamese
+            ? 'Bat chan giao dich, roi luu gioi han.'
+            : 'Enable trade blocking and save your limits.',
       ),
       _VerificationStep(
         title: 'MT5 terminal detected',
@@ -186,7 +205,9 @@ class GuardrailsFullProtectionFlowCard extends StatelessWidget {
       _VerificationStep(
         title: 'Backend enforcement loop running',
         done: backendRunning,
-        help: 'Keep the TradingDesk backend process running.',
+        help: isVietnamese
+            ? 'Giu TradingDesk dang chay de he thong bao ve tiep tuc hoat dong.'
+            : 'Keep TradingDesk running so protection can keep working.',
       ),
       _VerificationStep(
         title: 'Protection level FULL',

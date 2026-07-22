@@ -56,7 +56,7 @@ class BlockStateMachine:
                 - utc_offset_hours: UTC offset for trading day
         """
         self._config = config or {}
-        self._temporary_minutes = self._config.get("temporary_block_minutes", 60)
+        self._temporary_minutes = self._config.get("temporary_block_minutes", 15)
         self._utc_offset = self._config.get("utc_offset_hours", UTC_OFFSET_HOURS)
 
     def determine_state(
@@ -101,7 +101,8 @@ class BlockStateMachine:
 
     def calculate_expiry(
         self,
-        state: BlockStateEnum
+        state: BlockStateEnum,
+        triggered_by: Optional[list[str]] = None,
     ) -> Optional[datetime]:
         """
         Calculate expiry time for a given state.
@@ -182,7 +183,7 @@ class BlockStateMachine:
             else BlockType.TEMPORARY
         )
 
-        expires_at = self.calculate_expiry(state)
+        expires_at = self.calculate_expiry(state, triggered_by=triggered_by)
 
         return BlockState(
             account_id=account_id,
@@ -191,6 +192,7 @@ class BlockStateMachine:
             blocked_at=datetime.now(timezone.utc),
             expires_at=expires_at,
         )
+
 
     def is_blocking(self, state: BlockStateEnum) -> bool:
         """

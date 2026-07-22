@@ -9,10 +9,13 @@ from app.models import (
     AccountSnapshot,
     GuardrailSetting,
     NormalizedTrade,
+    RawMt5Import,
+    RawPosition,
     RuleBreak,
     TradingAccount,
 )
 from app.services.analytics_service import AnalyticsService
+from app.services.guardrail_service import GuardrailService
 
 
 class ViewModelService:
@@ -44,6 +47,55 @@ class ViewModelService:
             "analytics": self._dashboard_analytics(account_id, trades, today_trades, drawdown),
             "drawdown": drawdown,
             "recent_trades": [self._trade_summary(trade) for trade in recent_trades],
+        }
+
+    def live_state(self, account_id: int | None = None) -> dict:
+        latest_trade = self._latest_closed_trade(account_id)
+        latest_snapshot = self._latest_snapshot_summary(account_id)
+        latest_positions = self._latest_positions_summary(account_id)
+        latest_trade_payload = (
+            self._trade_summary(latest_trade) if latest_trade is not None else None
+        )
+        latest_trade_closed_at = (
+            latest_trade.closed_at.isoformat()
+            if latest_trade is not None and latest_trade.closed_at is not None
+            else None
+        )
+        latest_trade_id = latest_trade.id if latest_trade is not None else None
+        blocked = False
+        block_state: dict | None = None
+        if account_id is not None:
+            try:
+                block_state = GuardrailService(self._db).block_state(account_id)
+            except Exception:
+                block_state = None
+            blocked = bool(block_state and block_state.get("active"))
+        fingerprint = "|".join(
+            [
+                str(account_id or 0),
+                str(latest_snapshot.get("captured_at") if latest_snapshot else ""),
+                str(latest_positions.get("captured_at") if latest_positions else ""),
+                str(latest_trade_id or 0),
+                str(latest_trade_closed_at or ""),
+                "1" if blocked else "0",
+            ]
+        )
+        return {
+            "account_id": account_id,
+            "server_time": datetime.utcnow().isoformat(),
+            "latest_snapshot": latest_snapshot,
+            "positions": latest_positions,
+            "latest_trade": latest_trade_payload,
+            "latest_trade_id": latest_trade_id,
+            "latest_trade_closed_at": latest_trade_closed_at,
+            "block_state": block_state
+            or {
+                "active": False,
+                "block_type": None,
+                "remaining_seconds": 0,
+                "triggered_by": [],
+            },
+            "fingerprint": fingerprint,
         }
 
     def journal_calendar(self, account_id: int | None, month: str) -> dict:
@@ -466,6 +518,18 @@ class ViewModelService:
         trade = query.order_by(NormalizedTrade.closed_at.desc()).first()
         return trade.closed_at if trade else None
 
+    def _latest_closed_trade(self, account_id: int | None) -> NormalizedTrade | None:
+        query = self._db.query(NormalizedTrade).filter(
+            NormalizedTrade.status.in_(["closed", "breakeven"]),
+            NormalizedTrade.closed_at.isnot(None),
+        )
+        if account_id is not None:
+            query = query.filter(NormalizedTrade.account_id == account_id)
+        return query.order_by(
+            NormalizedTrade.closed_at.desc(),
+            NormalizedTrade.id.desc(),
+        ).first()
+
     def _mistake_frequency(self, trades: list[NormalizedTrade]) -> list[dict]:
         counter = defaultdict(int)
         for trade in trades:
@@ -563,6 +627,36 @@ class ViewModelService:
             "free_margin": snapshot.free_margin,
             "margin_level": snapshot.margin_level,
             "floating_profit": snapshot.profit,
+        }
+
+    def _latest_positions_summary(self, account_id: int | None) -> dict | None:
+        import_query = self._db.query(RawMt5Import).filter(
+            RawMt5Import.import_type == "positions",
+        )
+        if account_id is not None:
+            import_query = import_query.filter(RawMt5Import.account_id == account_id)
+        latest_import = import_query.order_by(
+            RawMt5Import.imported_at.desc(),
+            RawMt5Import.id.desc(),
+        ).first()
+        if latest_import is None:
+            return {
+                "captured_at": None,
+                "open_position_count": 0,
+                "floating_pnl": 0,
+            }
+
+        positions_query = self._db.query(RawPosition).filter(
+            RawPosition.raw_import_id == latest_import.id,
+        )
+        if account_id is not None:
+            positions_query = positions_query.filter(RawPosition.account_id == account_id)
+        positions = positions_query.all()
+        captured_at = positions[0].captured_at if positions else latest_import.imported_at
+        return {
+            "captured_at": captured_at.isoformat(),
+            "open_position_count": len(positions),
+            "floating_pnl": round(sum(position.profit or 0 for position in positions), 2),
         }
 
     def _guardrail_settings_summary(self, account_id: int | None) -> dict | None:

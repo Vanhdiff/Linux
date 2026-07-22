@@ -9,7 +9,7 @@ from __future__ import annotations
 from datetime import date, datetime, time, timedelta
 from typing import Any, Callable
 
-from app.models import NormalizedTrade, RawDeal, RawPosition, RuleBreak
+from app.models import NormalizedTrade, RawDeal, RawMt5Import, RawPosition, RuleBreak
 
 
 class GuardrailDataCollector:
@@ -137,19 +137,22 @@ class GuardrailDataCollector:
         return len(trade_keys)
 
     def latest_open_positions(self, account_id: int) -> list[dict]:
-        latest = (
-            self._db.query(RawPosition.captured_at)
-            .filter(RawPosition.account_id == account_id)
-            .order_by(RawPosition.captured_at.desc(), RawPosition.id.desc())
+        latest_import = (
+            self._db.query(RawMt5Import)
+            .filter(
+                RawMt5Import.account_id == account_id,
+                RawMt5Import.import_type == "positions",
+            )
+            .order_by(RawMt5Import.imported_at.desc(), RawMt5Import.id.desc())
             .first()
         )
-        if latest is None:
+        if latest_import is None:
             return []
         positions = (
             self._db.query(RawPosition)
             .filter(
                 RawPosition.account_id == account_id,
-                RawPosition.captured_at == latest[0],
+                RawPosition.raw_import_id == latest_import.id,
             )
             .order_by(RawPosition.opened_at.asc(), RawPosition.id.asc())
             .all()

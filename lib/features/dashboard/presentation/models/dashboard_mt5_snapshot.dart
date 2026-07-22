@@ -287,6 +287,95 @@ class DashboardApiView {
   }
 }
 
+class DashboardLiveProtectionStatus {
+  final bool backendBlockerRunning;
+  final bool blocked;
+  final DateTime? lastCheckedAt;
+  final DateTime? lastLiveSyncAt;
+  final DateTime? lastIncrementalSyncAt;
+  final int? latencyMs;
+
+  const DashboardLiveProtectionStatus({
+    required this.backendBlockerRunning,
+    required this.blocked,
+    required this.lastCheckedAt,
+    required this.lastLiveSyncAt,
+    required this.lastIncrementalSyncAt,
+    required this.latencyMs,
+  });
+
+  factory DashboardLiveProtectionStatus.fromJson(Map<String, dynamic> json) {
+    final livePoll = _map(json['live_poll']);
+    final incrementalSync = _map(json['incremental_sync']);
+    final latency = _map(json['latency']);
+    return DashboardLiveProtectionStatus(
+      backendBlockerRunning: json['backend_blocker_running'] as bool? ?? false,
+      blocked: json['blocked'] as bool? ?? false,
+      lastCheckedAt: _date(json['last_checked_at']),
+      lastLiveSyncAt: _date(livePoll['last_sync_at']),
+      lastIncrementalSyncAt: _date(incrementalSync['last_sync_at']),
+      latencyMs: latency['total_ms'] is num
+          ? (latency['total_ms'] as num).toInt()
+          : null,
+    );
+  }
+}
+
+class DashboardLiveState {
+  final String fingerprint;
+  final DateTime? serverTime;
+  final DateTime? snapshotCapturedAt;
+  final DateTime? positionsCapturedAt;
+  final int openPositionCount;
+  final double floatingPnl;
+  final int? latestTradeId;
+  final DateTime? latestTradeClosedAt;
+  final DashboardRecentTrade? latestTrade;
+  final DashboardBlockState blockState;
+  final DashboardLiveProtectionStatus protection;
+
+  const DashboardLiveState({
+    required this.fingerprint,
+    required this.serverTime,
+    required this.snapshotCapturedAt,
+    required this.positionsCapturedAt,
+    required this.openPositionCount,
+    required this.floatingPnl,
+    required this.latestTradeId,
+    required this.latestTradeClosedAt,
+    required this.latestTrade,
+    required this.blockState,
+    required this.protection,
+  });
+
+  factory DashboardLiveState.fromJson(Map<String, dynamic> json) {
+    final snapshot = _map(json['latest_snapshot']);
+    final positions = _map(json['positions']);
+    final latestTradeMap = _map(json['latest_trade']);
+    return DashboardLiveState(
+      fingerprint: _string(json['fingerprint'], fallback: ''),
+      serverTime: _date(json['server_time']),
+      snapshotCapturedAt: _date(snapshot['captured_at']),
+      positionsCapturedAt: _date(positions['captured_at']),
+      openPositionCount: _int(positions['open_position_count']),
+      floatingPnl: _double(positions['floating_pnl']),
+      latestTradeId: json['latest_trade_id'] is num
+          ? (json['latest_trade_id'] as num).toInt()
+          : null,
+      latestTradeClosedAt: _date(json['latest_trade_closed_at']),
+      latestTrade: latestTradeMap.isEmpty
+          ? null
+          : DashboardRecentTrade.fromJson(latestTradeMap),
+      blockState: DashboardBlockState.fromJson(_map(json['block_state'])),
+      protection: DashboardLiveProtectionStatus.fromJson(
+        _map(json['protection']),
+      ),
+    );
+  }
+
+  bool get hasClosedTradeSignal => latestTradeId != null || latestTradeClosedAt != null;
+}
+
 class DashboardGuardrailStatus {
   final bool enabled;
   final String status;

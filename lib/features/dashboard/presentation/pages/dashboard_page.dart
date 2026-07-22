@@ -23,20 +23,31 @@ class DashboardPage extends StatefulWidget {
 class _DashboardPageState extends State<DashboardPage> {
   late final DashboardRemoteDataSource _dataSource;
   Timer? _refreshTimer;
+  Timer? _liveTimer;
   DashboardApiView _dashboard = DashboardApiView.empty();
   DashboardGuardrailStatus? _guardrails;
+  DashboardLiveState? _liveState;
   DashboardPeriod _period = DashboardPeriod.day;
   bool _isLoading = true;
+  bool _isRefreshing = false;
+  bool _requestInFlight = false;
+  bool _liveRequestInFlight = false;
+  bool _hasLoadedDashboard = false;
   String? _errorMessage;
 
   @override
   void initState() {
     super.initState();
     _dataSource = DashboardRemoteDataSource();
-    _loadDashboard();
-    _refreshTimer = Timer.periodic(Duration(seconds: 15), (_) {
-      if (mounted && !_isLoading) {
-        _loadDashboard();
+    _loadDashboard(showLoading: true);
+    _refreshTimer = Timer.periodic(Duration(seconds: 10), (_) {
+      if (mounted && !_requestInFlight) {
+        _loadDashboard(silent: true);
+      }
+    });
+    _liveTimer = Timer.periodic(Duration(milliseconds: 500), (_) {
+      if (mounted && !_liveRequestInFlight) {
+        _pollLiveState();
       }
     });
   }
@@ -44,20 +55,39 @@ class _DashboardPageState extends State<DashboardPage> {
   @override
   void dispose() {
     _refreshTimer?.cancel();
+    _liveTimer?.cancel();
     _dataSource.close();
     super.dispose();
   }
 
-  Future<void> _loadDashboard({DashboardPeriod? period}) async {
+  Future<void> _loadDashboard({
+    DashboardPeriod? period,
+    bool refreshMt5 = false,
+    bool showLoading = false,
+    bool silent = false,
+  }) async {
+    if (_requestInFlight) return;
     final nextPeriod = period ?? _period;
-    setState(() {
+    final periodChanged = nextPeriod != _period;
+    final useFullLoading =
+        !silent && (showLoading || (!_hasLoadedDashboard && !_isRefreshing));
+    _requestInFlight = true;
+    if (!silent) {
+      setState(() {
+        _period = nextPeriod;
+        _isLoading = useFullLoading || periodChanged;
+        _isRefreshing = !_isLoading;
+        _errorMessage = null;
+      });
+    } else {
       _period = nextPeriod;
-      _isLoading = true;
-      _errorMessage = null;
-    });
+    }
 
     try {
-      final dashboard = await _dataSource.getDashboard(period: nextPeriod);
+      final dashboard = await _dataSource.getDashboard(
+        period: nextPeriod,
+        refreshMt5: refreshMt5,
+      );
       DashboardGuardrailStatus? guardrails;
       try {
         guardrails = await _dataSource.getGuardrailStatus();
@@ -68,15 +98,57 @@ class _DashboardPageState extends State<DashboardPage> {
       setState(() {
         _dashboard = dashboard;
         _guardrails = guardrails;
+        _hasLoadedDashboard = true;
         _isLoading = false;
+        _isRefreshing = false;
+        _requestInFlight = false;
       });
     } catch (error) {
       if (!mounted) return;
+      if (silent) {
+        _requestInFlight = false;
+        return;
+      }
       setState(() {
         _isLoading = false;
+        _isRefreshing = false;
+        _requestInFlight = false;
         _errorMessage =
             'Trading service is starting. Refresh if data does not appear shortly.';
       });
+    }
+  }
+
+  Future<void> _pollLiveState() async {
+    if (_liveRequestInFlight) return;
+    _liveRequestInFlight = true;
+    final previousFingerprint = _liveState?.fingerprint;
+    final previousTradeId = _liveState?.latestTradeId;
+    final previousBlocked = _liveState?.blockState.active ?? false;
+    final previousPositionCount = _liveState?.openPositionCount ?? 0;
+    try {
+      final liveState = await _dataSource.getLiveState();
+      if (!mounted) return;
+      final hasFingerprintChanged =
+          previousFingerprint != null &&
+          previousFingerprint.isNotEmpty &&
+          previousFingerprint != liveState.fingerprint;
+      final latestTradeChanged = previousTradeId != liveState.latestTradeId;
+      final blockChanged = previousBlocked != liveState.blockState.active;
+      final positionCountChanged =
+          previousPositionCount != liveState.openPositionCount;
+      setState(() {
+        _liveState = liveState;
+      });
+      if (hasFingerprintChanged &&
+          !_requestInFlight &&
+          (latestTradeChanged || blockChanged || positionCountChanged)) {
+        unawaited(_loadDashboard(silent: true));
+      }
+    } catch (_) {
+      if (!mounted) return;
+    } finally {
+      _liveRequestInFlight = false;
     }
   }
 
@@ -110,8 +182,12 @@ class _DashboardPageState extends State<DashboardPage> {
                     children: [
                       _DashboardHeader(
                         isLoading: _isLoading,
+                        isRefreshing: _isRefreshing,
+                        liveState: _liveState,
                         errorMessage: _errorMessage,
-                        onRefresh: _loadDashboard,
+                        onRefresh: () {
+                          _loadDashboard(refreshMt5: true);
+                        },
                         selectedPeriod: _period,
                         onPeriodChanged: (period) {
                           _loadDashboard(period: period);
@@ -180,6 +256,8 @@ class _DashboardPageState extends State<DashboardPage> {
 
 class _DashboardHeader extends StatelessWidget {
   final bool isLoading;
+  final bool isRefreshing;
+  final DashboardLiveState? liveState;
   final String? errorMessage;
   final VoidCallback onRefresh;
   final DashboardPeriod selectedPeriod;
@@ -187,6 +265,8 @@ class _DashboardHeader extends StatelessWidget {
 
   const _DashboardHeader({
     required this.isLoading,
+    required this.isRefreshing,
+    required this.liveState,
     required this.errorMessage,
     required this.onRefresh,
     required this.selectedPeriod,
@@ -224,12 +304,14 @@ class _DashboardHeader extends StatelessWidget {
         ),
         _DashboardStatusPill(
           isLoading: isLoading,
+          isRefreshing: isRefreshing,
+          liveState: liveState,
           hasError: errorMessage != null,
         ),
         SizedBox(width: 8),
         IconButton(
-          onPressed: isLoading ? null : onRefresh,
-          icon: isLoading
+          onPressed: isLoading || isRefreshing ? null : onRefresh,
+          icon: isLoading || isRefreshing
               ? SizedBox(
                   width: 14,
                   height: 14,
@@ -252,30 +334,78 @@ class _DashboardHeader extends StatelessWidget {
         'Loading trading account, positions, and performance analytics...',
       );
     }
+    if (isRefreshing) {
+      return strings.isVietnamese
+          ? 'Dang cap nhat du lieu moi nhat, man hinh hien tai van giu nguyen.'
+          : 'Updating latest data while keeping the current view stable.';
+    }
     if (errorMessage != null) return errorMessage!;
+    if (liveState != null) {
+      final closedTradeTime = liveState!.latestTradeClosedAt;
+      final updatedAt = liveState!.positionsCapturedAt ?? liveState!.snapshotCapturedAt;
+      final blocked = liveState!.blockState.active;
+      final label = strings.isVietnamese
+          ? 'MT5 live: ${liveState!.openPositionCount} lenh mo, floating ${dashboardMoney(liveState!.floatingPnl)}.'
+          : 'MT5 live: ${liveState!.openPositionCount} open positions, floating ${dashboardMoney(liveState!.floatingPnl)}.';
+      final suffix = updatedAt == null
+          ? ''
+          : strings.isVietnamese
+          ? ' Cap nhat ${_formatLiveTime(updatedAt)}.'
+          : ' Updated ${_formatLiveTime(updatedAt)}.';
+      final tradeSuffix = closedTradeTime == null
+          ? ''
+          : strings.isVietnamese
+          ? ' Lenh dong moi nhat ${_formatLiveTime(closedTradeTime)}.'
+          : ' Last closed trade ${_formatLiveTime(closedTradeTime)}.';
+      final blockSuffix = blocked
+          ? (strings.isVietnamese
+                ? ' Guardrail dang khoa giao dich.'
+                : ' Guardrails are actively blocking trading.')
+          : '';
+      return '$label$suffix$tradeSuffix$blockSuffix';
+    }
     return strings.text(
       'Trading analytics connected - account, risk, and performance are calculated from broker data.',
     );
+  }
+
+  String _formatLiveTime(DateTime value) {
+    final local = value.toLocal();
+    String two(int number) => number.toString().padLeft(2, '0');
+    return '${two(local.hour)}:${two(local.minute)}:${two(local.second)}';
   }
 }
 
 class _DashboardStatusPill extends StatelessWidget {
   final bool isLoading;
+  final bool isRefreshing;
+  final DashboardLiveState? liveState;
   final bool hasError;
 
-  const _DashboardStatusPill({required this.isLoading, required this.hasError});
+  const _DashboardStatusPill({
+    required this.isLoading,
+    required this.isRefreshing,
+    required this.liveState,
+    required this.hasError,
+  });
 
   @override
   Widget build(BuildContext context) {
-    final color = isLoading
+    final color = isLoading || isRefreshing
         ? AppColors.warning
         : hasError
         ? AppColors.danger
+        : !(liveState?.protection.backendBlockerRunning ?? true)
+        ? AppColors.warning
         : AppColors.success;
     final label = isLoading
-        ? 'Syncing'
+        ? 'Loading'
+        : isRefreshing
+        ? 'Updating'
         : hasError
         ? 'Offline'
+        : !(liveState?.protection.backendBlockerRunning ?? true)
+        ? 'Starting'
         : 'Live';
     return Container(
       padding: EdgeInsets.symmetric(horizontal: 10, vertical: 6),

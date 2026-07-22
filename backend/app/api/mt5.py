@@ -2,6 +2,7 @@ from datetime import datetime, timezone
 from typing import Annotated
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Request, status
+from sqlalchemy.exc import OperationalError
 from sqlalchemy.orm import Session
 
 from app.application.mt5_demo_harness import Mt5DemoHarnessService
@@ -29,6 +30,16 @@ from app.services.normalize_service import NormalizationService
 
 router = APIRouter(prefix="/mt5", tags=["mt5"])
 mt5_service = Mt5Service()
+
+
+def _database_write_error_message(exc: OperationalError) -> str:
+    message = str(exc.orig if getattr(exc, "orig", None) is not None else exc)
+    if "readonly database" in message.lower():
+        return (
+            "TradingDesk database is read-only. Close the app, make sure the "
+            "TradingDesk data folder is writable, then try again."
+        )
+    return f"TradingDesk database write failed: {message}"
 
 
 @router.get("/status", response_model=Mt5ConnectionStatus)
@@ -331,6 +342,11 @@ def mt5_bootstrap(
             sync=sync_result,
             normalized=normalized.model_dump(),
         )
+    except OperationalError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail=_database_write_error_message(exc),
+        ) from exc
     except RuntimeError as exc:
         raise HTTPException(
             status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
@@ -360,6 +376,11 @@ def _import_raw_from_mt5(
 ) -> Mt5SyncResult:
     try:
         return Mt5SyncService(db, mt5_service).import_raw(payload)
+    except OperationalError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail=_database_write_error_message(exc),
+        ) from exc
     except RuntimeError as exc:
         raise HTTPException(
             status_code=status.HTTP_503_SERVICE_UNAVAILABLE,

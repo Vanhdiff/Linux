@@ -12,7 +12,6 @@ import '../../../../app/theme/app_colors.dart';
 import '../../guardrails_defaults.dart';
 import '../../guardrails_form_support.dart';
 import '../../data/datasources/guardrails_remote_datasource.dart';
-import '../widgets/guardrails_demo_harness_card.dart';
 import '../widgets/guardrails_full_protection_flow_card.dart';
 import '../widgets/guardrails_form_controls.dart';
 import '../widgets/guardrails_mt5_setup_card.dart';
@@ -71,9 +70,7 @@ class _GuardrailsPageState extends State<GuardrailsPage> {
   bool _installingEa = false;
   bool _compilingEa = false;
   bool _refreshingMt5Setup = false;
-  bool _loadingDemoHarness = false;
   bool _showMt5SetupDetails = false;
-  bool _showDemoHarnessDetails = false;
   bool _mt5ReadyNoticeShown = false;
   String? _notice;
 
@@ -104,7 +101,8 @@ class _GuardrailsPageState extends State<GuardrailsPage> {
       builder: (context, constraints) {
         const horizontalPadding = 22.0;
         final contentWidth = constraints.maxWidth - horizontalPadding * 2;
-        final pageWidth = contentWidth < 1120 ? 1120.0 : contentWidth;
+        final stackPanels = contentWidth < 1320;
+        final pageWidth = contentWidth < 0 ? 0.0 : contentWidth;
         return SingleChildScrollView(
           padding: const EdgeInsets.fromLTRB(
             horizontalPadding,
@@ -112,26 +110,34 @@ class _GuardrailsPageState extends State<GuardrailsPage> {
             horizontalPadding,
             24,
           ),
-          child: SingleChildScrollView(
-            scrollDirection: Axis.horizontal,
-            child: SizedBox(
-              width: pageWidth,
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  GuardrailsHeader(
+          child: SizedBox(
+            width: pageWidth,
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                GuardrailsHeader(
+                  status: _status,
+                  loading: _loading,
+                  onRefresh: _loadStatus,
+                ),
+                const SizedBox(height: 18),
+                GuardrailsStatusStrip(
+                  status: _status,
+                  protectionStatus: _mt5ProtectionStatus,
+                ),
+                const SizedBox(height: 14),
+                _BlockBanner(status: _status),
+                const SizedBox(height: 16),
+                if (stackPanels) ...[
+                  _buildSettingsPanel(),
+                  const SizedBox(height: 16),
+                  GuardrailsRulesPanel(
+                    accountId: _accountId,
                     status: _status,
-                    loading: _loading,
-                    onRefresh: _loadStatus,
+                    mt5BlockerStatus: _mt5BlockerStatus,
+                    mt5ProtectionStatus: _mt5ProtectionStatus,
                   ),
-                  const SizedBox(height: 14),
-                  GuardrailsStatusStrip(
-                    status: _status,
-                    protectionStatus: _mt5ProtectionStatus,
-                  ),
-                  const SizedBox(height: 14),
-                  _BlockBanner(status: _status),
-                  const SizedBox(height: 14),
+                ] else
                   Row(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
@@ -148,8 +154,7 @@ class _GuardrailsPageState extends State<GuardrailsPage> {
                       ),
                     ],
                   ),
-                ],
-              ),
+              ],
             ),
           ),
         );
@@ -349,19 +354,6 @@ class _GuardrailsPageState extends State<GuardrailsPage> {
               setState(() => _showMt5SetupDetails = !_showMt5SetupDetails);
             },
           ),
-          const SizedBox(height: 12),
-          GuardrailsDemoHarnessCard(
-            report: _mt5DemoHarnessReport,
-            loading: _loadingDemoHarness,
-            showDetails: _showDemoHarnessDetails,
-            onRefresh: _refreshDemoHarnessReport,
-            onCopyReport: _copyMt5DemoHarnessReport,
-            onToggleDetails: () {
-              setState(
-                () => _showDemoHarnessDetails = !_showDemoHarnessDetails,
-              );
-            },
-          ),
         ],
       ),
     );
@@ -447,8 +439,9 @@ class _GuardrailsPageState extends State<GuardrailsPage> {
         _mt5BlockerStatus = blockerStatus;
         _mt5DemoHarnessReport = demoHarnessReport;
         if (nowReady && !wasReady && !_mt5ReadyNoticeShown) {
-          _notice =
-              'EA heartbeat detected. MT5 protection is now connected and ready.';
+          _notice = AppLocalization.of(context).isVietnamese
+              ? 'Da nhan heartbeat tu EA. MT5 va che do bao ve da ket noi xong.'
+              : 'EA heartbeat detected. MT5 protection is now connected and ready.';
           _mt5ReadyNoticeShown = true;
         } else if (!nowReady) {
           _mt5ReadyNoticeShown = false;
@@ -518,8 +511,9 @@ class _GuardrailsPageState extends State<GuardrailsPage> {
       if (!mounted) return;
       setState(() {
         _loading = false;
-        _notice =
-            'Trading service is starting - recommended local defaults are available while data loads.';
+        _notice = AppLocalization.of(context).isVietnamese
+            ? 'Dich vu dang khoi dong. Tam thoi app van dung cac gia tri mac dinh de ban tiep tuc thao tac.'
+            : 'Trading service is starting - recommended local defaults are available while data loads.';
       });
     }
   }
@@ -528,12 +522,15 @@ class _GuardrailsPageState extends State<GuardrailsPage> {
     try {
       await _remote.openMt5ExpertsFolder();
       if (!mounted) return;
-      setState(() => _notice = 'Opened MT5 Experts folder.');
+      setState(() => _notice = AppLocalization.of(context).isVietnamese
+          ? 'Da mo thu muc MT5 Experts.'
+          : 'Opened MT5 Experts folder.');
     } catch (error) {
       if (!mounted) return;
       setState(() {
-        _notice =
-            'Could not open Experts folder: ${error is ApiException ? error.message : error}';
+        _notice = AppLocalization.of(context).isVietnamese
+            ? 'Khong mo duoc thu muc Experts: ${error is ApiException ? error.message : error}'
+            : 'Could not open Experts folder: ${error is ApiException ? error.message : error}';
       });
     }
   }
@@ -569,42 +566,24 @@ class _GuardrailsPageState extends State<GuardrailsPage> {
         _mt5DemoHarnessReport = demoHarnessReport;
         _installingEa = false;
         _notice = compiled && verified
-            ? 'EA installed, compiled, and verified. Attach TradingDeskGuardEA to one chart, then enable Algo Trading.'
+            ? (AppLocalization.of(context).isVietnamese
+                ? 'EA da duoc cai va compile xong. Hay gan TradingDeskGuardEA vao 1 chart roi bat Algo Trading.'
+                : 'EA installed, compiled, and verified. Attach TradingDeskGuardEA to one chart, then enable Algo Trading.')
             : (issue == null
-                  ? 'EA copied, but compile/verify did not complete. Open Experts folder or rerun Install EA.'
-                  : 'EA copied, but compile/verify did not complete: $issue');
+                  ? (AppLocalization.of(context).isVietnamese
+                      ? 'EA da duoc copy, nhung compile/xac nhan chua xong. Hay mo thu muc Experts hoac chay lai Cai EA.'
+                      : 'EA copied, but compile/verify did not complete. Open Experts folder or rerun Install EA.')
+                  : (AppLocalization.of(context).isVietnamese
+                      ? 'EA da duoc copy, nhung compile/xac nhan chua xong: $issue'
+                      : 'EA copied, but compile/verify did not complete: $issue'));
       });
     } catch (error) {
       if (!mounted) return;
       setState(() {
         _installingEa = false;
-        _notice =
-            'Could not install EA: ${error is ApiException ? error.message : error}';
-      });
-    }
-  }
-
-  Future<void> _refreshDemoHarnessReport() async {
-    setState(() {
-      _loadingDemoHarness = true;
-      _notice = null;
-    });
-
-    try {
-      final report = await _remote.fetchMt5DemoHarnessReport(
-        accountId: _accountId,
-      );
-      if (!mounted) return;
-      setState(() {
-        _mt5DemoHarnessReport = report;
-        _loadingDemoHarness = false;
-      });
-    } catch (error) {
-      if (!mounted) return;
-      setState(() {
-        _loadingDemoHarness = false;
-        _notice =
-            'Could not load demo validation report: ${error is ApiException ? error.message : error}';
+        _notice = AppLocalization.of(context).isVietnamese
+            ? 'Khong cai duoc EA: ${error is ApiException ? error.message : error}'
+            : 'Could not install EA: ${error is ApiException ? error.message : error}';
       });
     }
   }
@@ -646,17 +625,24 @@ class _GuardrailsPageState extends State<GuardrailsPage> {
         _mt5DemoHarnessReport = demoHarnessReport;
         _repairingEa = false;
         _notice = repaired
-            ? 'One-click setup completed on the backend. If heartbeat is not live yet, attach the EA to one chart and enable Algo Trading in MT5.'
+            ? (AppLocalization.of(context).isVietnamese
+                ? 'Thiet lap 1 lan bam da chay xong. Neu heartbeat chua len, hay gan EA vao 1 chart va bat Algo Trading trong MT5.'
+                : 'One-click setup completed on the backend. If heartbeat is not live yet, attach the EA to one chart and enable Algo Trading in MT5.')
             : (issue != null
-                  ? 'One-click setup needs attention: $issue'
-                  : 'One-click setup needs one more step: ${nextAction ?? 'review MT5 setup report.'}');
+                  ? (AppLocalization.of(context).isVietnamese
+                      ? 'Thiet lap 1 lan bam can xu ly them: $issue'
+                      : 'One-click setup needs attention: $issue')
+                  : (AppLocalization.of(context).isVietnamese
+                      ? 'Thiet lap 1 lan bam con thieu 1 buoc: ${nextAction ?? 'xem bao cao thiet lap MT5.'}'
+                      : 'One-click setup needs one more step: ${nextAction ?? 'review MT5 setup report.'}'));
       });
     } catch (error) {
       if (!mounted) return;
       setState(() {
         _repairingEa = false;
-        _notice =
-            'Could not repair EA setup: ${error is ApiException ? error.message : error}';
+        _notice = AppLocalization.of(context).isVietnamese
+            ? 'Khong the sua thiet lap EA: ${error is ApiException ? error.message : error}'
+            : 'Could not repair EA setup: ${error is ApiException ? error.message : error}';
       });
     }
   }
@@ -692,17 +678,24 @@ class _GuardrailsPageState extends State<GuardrailsPage> {
         _mt5DemoHarnessReport = demoHarnessReport;
         _compilingEa = false;
         _notice = compiled && verified
-            ? 'EA compiled and verified. Attach TradingDeskGuardEA to one chart, then enable Algo Trading.'
+            ? (AppLocalization.of(context).isVietnamese
+                ? 'EA da compile xong. Hay gan TradingDeskGuardEA vao 1 chart roi bat Algo Trading.'
+                : 'EA compiled and verified. Attach TradingDeskGuardEA to one chart, then enable Algo Trading.')
             : (issue == null
-                  ? 'Compile did not complete cleanly. Copy Report to inspect MetaEditor/log diagnostics.'
-                  : 'Compile did not complete cleanly: $issue');
+                  ? (AppLocalization.of(context).isVietnamese
+                      ? 'Compile chua hoan tat gon gang. Hay sao chep bao cao de xem them chan doan MetaEditor/log.'
+                      : 'Compile did not complete cleanly. Copy Report to inspect MetaEditor/log diagnostics.')
+                  : (AppLocalization.of(context).isVietnamese
+                      ? 'Compile chua hoan tat gon gang: $issue'
+                      : 'Compile did not complete cleanly: $issue'));
       });
     } catch (error) {
       if (!mounted) return;
       setState(() {
         _compilingEa = false;
-        _notice =
-            'Could not compile EA: ${error is ApiException ? error.message : error}';
+        _notice = AppLocalization.of(context).isVietnamese
+            ? 'Khong compile duoc EA: ${error is ApiException ? error.message : error}'
+            : 'Could not compile EA: ${error is ApiException ? error.message : error}';
       });
     }
   }
@@ -783,30 +776,17 @@ class _GuardrailsPageState extends State<GuardrailsPage> {
       const encoder = JsonEncoder.withIndent('  ');
       await Clipboard.setData(ClipboardData(text: encoder.convert(report)));
       if (!mounted) return;
-      setState(() => _notice = 'MT5 setup report copied.');
-    } catch (error) {
-      if (!mounted) return;
       setState(() {
-        _notice =
-            'Could not copy MT5 setup report: ${error is ApiException ? error.message : error}';
+        _notice = AppLocalization.of(context).isVietnamese
+            ? 'Da sao chep bao cao thiet lap MT5.'
+            : 'MT5 setup report copied.';
       });
-    }
-  }
-
-  Future<void> _copyMt5DemoHarnessReport() async {
-    try {
-      final report =
-          _mt5DemoHarnessReport ??
-          await _remote.fetchMt5DemoHarnessReport(accountId: _accountId);
-      const encoder = JsonEncoder.withIndent('  ');
-      await Clipboard.setData(ClipboardData(text: encoder.convert(report)));
-      if (!mounted) return;
-      setState(() => _notice = 'MT5 demo validation report copied.');
     } catch (error) {
       if (!mounted) return;
       setState(() {
-        _notice =
-            'Could not copy demo validation report: ${error is ApiException ? error.message : error}';
+        _notice = AppLocalization.of(context).isVietnamese
+            ? 'Khong sao chep duoc bao cao thiet lap MT5: ${error is ApiException ? error.message : error}'
+            : 'Could not copy MT5 setup report: ${error is ApiException ? error.message : error}';
       });
     }
   }
@@ -816,18 +796,22 @@ class _GuardrailsPageState extends State<GuardrailsPage> {
       await Clipboard.setData(const ClipboardData(text: ApiConfig.baseUrl));
       if (!mounted) return;
       setState(() {
-        _notice =
-            'Copied backend URL. In MT5: Tools -> Options -> Expert Advisors -> Allow WebRequest for listed URL.';
+        _notice = AppLocalization.of(context).isVietnamese
+            ? 'Da sao chep URL ket noi. Trong MT5: Tools -> Options -> Expert Advisors -> cho phep WebRequest cho URL nay.'
+            : 'Copied connection URL. In MT5: Tools -> Options -> Expert Advisors -> Allow WebRequest for listed URL.';
       });
     } catch (error) {
       if (!mounted) return;
       setState(() {
-        _notice = 'Could not copy backend URL: $error';
+        _notice = AppLocalization.of(context).isVietnamese
+            ? 'Khong sao chep duoc URL ket noi: $error'
+            : 'Could not copy connection URL: $error';
       });
     }
   }
 
   Future<void> _save() async {
+    final strings = AppLocalization.of(context);
     final input = GuardrailsParsedInput.tryParse(
       maxTradesPerDay: _maxTradesController.text,
       maxDailyLoss: _maxDailyLossController.text,
@@ -842,7 +826,11 @@ class _GuardrailsPageState extends State<GuardrailsPage> {
     );
 
     if (input == null) {
-      setState(() => _notice = 'Please enter valid numeric guardrails.');
+      setState(() {
+        _notice = AppLocalization.of(context).isVietnamese
+            ? 'Hay nhap gia tri hop le cho cac gioi han.'
+            : 'Please enter valid numbers for your limits.';
+      });
       return;
     }
 
@@ -873,8 +861,12 @@ class _GuardrailsPageState extends State<GuardrailsPage> {
       setState(() {
         _saving = false;
         _notice = _tradeBlockingEnabled
-            ? 'Guardrails saved. MT5 trade blocker will enforce active limits.'
-            : 'Guardrails saved. Trade blocking is currently off.';
+            ? strings.text(
+                'Guardrails saved. MT5 trade blocker will enforce active limits.',
+              )
+            : strings.text(
+                'Guardrails saved. Trade blocking is currently off.',
+              );
       });
     } catch (error) {
       if (!mounted) return;
@@ -914,7 +906,9 @@ class _GuardrailsPageState extends State<GuardrailsPage> {
       }
       return error.message;
     }
-    return 'Could not save guardrails. Backend may be offline.';
+    return AppLocalization.of(context).isVietnamese
+        ? 'Khong luu duoc gioi han. Dich vu co the dang khoi dong hoac tam thoi mat ket noi.'
+        : 'Could not save limits. The service may still be starting or temporarily offline.';
   }
 
   void _resetDefaults() {

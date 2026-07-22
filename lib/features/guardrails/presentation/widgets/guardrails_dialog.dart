@@ -328,8 +328,9 @@ class _GuardrailsDialogState extends State<GuardrailsDialog> {
       if (!mounted) return;
       setState(() {
         _loading = false;
-        _errorMessage =
-            'Could not load saved guardrails. Editing local defaults.';
+        _errorMessage = AppLocalization.of(context).isVietnamese
+            ? 'Chua tai duoc gioi han da luu. Tam thoi dung gia tri mac dinh.'
+            : 'Could not load saved limits. Editing local defaults.';
       });
     }
   }
@@ -349,7 +350,11 @@ class _GuardrailsDialogState extends State<GuardrailsDialog> {
     );
 
     if (input == null) {
-      setState(() => _errorMessage = 'Please enter valid numeric guardrails.');
+      setState(() {
+        _errorMessage = AppLocalization.of(context).isVietnamese
+            ? 'Hay nhap gia tri hop le cho cac gioi han.'
+            : 'Please enter valid numbers for your limits.';
+      });
       return;
     }
 
@@ -381,7 +386,9 @@ class _GuardrailsDialogState extends State<GuardrailsDialog> {
       if (!mounted) return;
       setState(() {
         _saving = false;
-        _errorMessage = 'Could not save guardrails: $error';
+        _errorMessage = AppLocalization.of(context).isVietnamese
+            ? 'Khong luu duoc gioi han: $error'
+            : 'Could not save limits: $error';
       });
     }
   }

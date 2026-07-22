@@ -1,4 +1,4 @@
-import 'package:fluent_ui/fluent_ui.dart';
+﻿import 'package:fluent_ui/fluent_ui.dart';
 
 import '../../../../app/i18n/app_localization.dart';
 import '../../../../app/i18n/app_strings.dart';
@@ -15,20 +15,14 @@ class AiCoachPage extends StatefulWidget {
 
 class _AiCoachPageState extends State<AiCoachPage> {
   final AiCoachRemoteDataSource _dataSource = AiCoachRemoteDataSource();
-  final TextEditingController _chatController = TextEditingController();
-  final List<_ChatMessage> _chatMessages = [];
   AiCoachView _view = AiCoachView.empty();
   String _period = 'day';
   String _language = 'en';
   bool _loading = true;
-  bool _chatLoading = false;
-  int _chatRemaining = 5;
-  int _chatLimit = 5;
   String? _error;
 
   @override
   void dispose() {
-    _chatController.dispose();
     _dataSource.close();
     super.dispose();
   }
@@ -71,35 +65,6 @@ class _AiCoachPageState extends State<AiCoachPage> {
     }
   }
 
-  Future<void> _sendChat([String? preset]) async {
-    final question = (preset ?? _chatController.text).trim();
-    if (question.isEmpty || _chatLoading) return;
-    setState(() {
-      _chatLoading = true;
-      _chatController.clear();
-      _chatMessages.add(_ChatMessage.user(question));
-    });
-    try {
-      final response = await _dataSource.sendChat(
-        question: question,
-        language: _language,
-      );
-      if (!mounted) return;
-      setState(() {
-        _chatRemaining = response.remaining;
-        _chatLimit = response.limit;
-        _chatMessages.add(_ChatMessage.coach(response.answer));
-        _chatLoading = false;
-      });
-    } catch (error) {
-      if (!mounted) return;
-      setState(() {
-        _chatMessages.add(_ChatMessage.coach('$error'));
-        _chatLoading = false;
-      });
-    }
-  }
-
   @override
   Widget build(BuildContext context) {
     return LayoutBuilder(
@@ -130,16 +95,6 @@ class _AiCoachPageState extends State<AiCoachPage> {
                   ),
                   const SizedBox(height: 14),
                   _HeroReviewCard(view: _view),
-                  const SizedBox(height: 16),
-                  _CoachChatPanel(
-                    controller: _chatController,
-                    messages: _chatMessages,
-                    loading: _chatLoading,
-                    remaining: _chatRemaining,
-                    limit: _chatLimit,
-                    onSend: _sendChat,
-                    onPreset: _sendChat,
-                  ),
                   const SizedBox(height: 16),
                   _GuardrailScorePanel(contextData: _view.context),
                   const SizedBox(height: 16),
@@ -187,21 +142,6 @@ class _AiCoachPageState extends State<AiCoachPage> {
         );
       },
     );
-  }
-}
-
-class _ChatMessage {
-  final String text;
-  final bool fromUser;
-
-  const _ChatMessage({required this.text, required this.fromUser});
-
-  factory _ChatMessage.user(String text) {
-    return _ChatMessage(text: text, fromUser: true);
-  }
-
-  factory _ChatMessage.coach(String text) {
-    return _ChatMessage(text: text, fromUser: false);
   }
 }
 
@@ -284,159 +224,6 @@ class _AiHeader extends StatelessWidget {
           onChanged: onPeriodChanged,
         ),
       ],
-    );
-  }
-}
-
-class _CoachChatPanel extends StatelessWidget {
-  final TextEditingController controller;
-  final List<_ChatMessage> messages;
-  final bool loading;
-  final int remaining;
-  final int limit;
-  final VoidCallback onSend;
-  final ValueChanged<String> onPreset;
-
-  const _CoachChatPanel({
-    required this.controller,
-    required this.messages,
-    required this.loading,
-    required this.remaining,
-    required this.limit,
-    required this.onSend,
-    required this.onPreset,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    final strings = AppLocalization.of(context);
-    final presets = strings.isVietnamese
-        ? const [
-            'Vì sao tháng này tôi đang lỗ?',
-            'Tôi cần cải thiện gì phiên tới?',
-            'Symbol nào nên tạm tránh?',
-          ]
-        : const [
-            'Why am I losing this month?',
-            'What should I improve next session?',
-            'Which symbol should I pause?',
-          ];
-
-    return AppPanel(
-      padding: const EdgeInsets.all(18),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              const _PanelTitle(
-                icon: FluentIcons.chat_bot,
-                title: 'Coach Chat',
-              ),
-              const Spacer(),
-              Text(
-                '$remaining/$limit questions left today',
-                style: TextStyle(
-                  color: remaining == 0
-                      ? AppColors.warning
-                      : AppColors.textSecondary,
-                  fontSize: 12,
-                  fontWeight: FontWeight.w700,
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 12),
-          if (messages.isEmpty)
-            Wrap(
-              spacing: 8,
-              runSpacing: 8,
-              children: [
-                for (final preset in presets)
-                  Button(
-                    onPressed: loading || remaining == 0
-                        ? null
-                        : () => onPreset(preset),
-                    child: Text(preset),
-                  ),
-              ],
-            )
-          else
-            Container(
-              constraints: const BoxConstraints(maxHeight: 260),
-              child: SingleChildScrollView(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
-                  children: [
-                    for (final message in messages) _ChatBubble(message),
-                  ],
-                ),
-              ),
-            ),
-          const SizedBox(height: 12),
-          Row(
-            children: [
-              Expanded(
-                child: TextBox(
-                  controller: controller,
-                  enabled: !loading && remaining > 0,
-                  placeholder: strings.isVietnamese
-                      ? 'Hỏi về lệnh, risk, kỷ luật, kế hoạch phiên tới...'
-                      : 'Ask about trades, risk, discipline, next session plan...',
-                  onSubmitted: (_) => onSend(),
-                ),
-              ),
-              const SizedBox(width: 10),
-              FilledButton(
-                onPressed: loading || remaining == 0 ? null : onSend,
-                child: loading
-                    ? SizedBox(
-                        width: 14,
-                        height: 14,
-                        child: ProgressRing(strokeWidth: 2),
-                      )
-                    : const Icon(FluentIcons.send, size: 14),
-              ),
-            ],
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _ChatBubble extends StatelessWidget {
-  final _ChatMessage message;
-
-  const _ChatBubble(this.message);
-
-  @override
-  Widget build(BuildContext context) {
-    return Align(
-      alignment: message.fromUser
-          ? Alignment.centerRight
-          : Alignment.centerLeft,
-      child: Container(
-        margin: const EdgeInsets.only(bottom: 8),
-        constraints: const BoxConstraints(maxWidth: 720),
-        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-        decoration: BoxDecoration(
-          color: message.fromUser ? AppColors.primary : AppColors.surfaceAlt,
-          borderRadius: BorderRadius.circular(12),
-          border: Border.all(
-            color: message.fromUser ? AppColors.primary : AppColors.border,
-          ),
-        ),
-        child: Text(
-          message.text,
-          style: TextStyle(
-            color: message.fromUser ? Colors.white : AppColors.textPrimary,
-            fontSize: 13,
-            height: 1.35,
-            fontWeight: FontWeight.w600,
-          ),
-        ),
-      ),
     );
   }
 }
@@ -1172,69 +959,70 @@ String _coachText(AppStrings strings, String value) {
     r'^Closed (\d+) trades with net PnL ([^ ]+) and win rate ([\d.]+)%\.$',
   ).firstMatch(value);
   if (match != null) {
-    return 'Đã đóng ${match[1]} lệnh với PnL ròng ${match[2]} và tỷ lệ thắng ${match[3]}%.';
+    return 'ÄĂ£ Ä‘Ă³ng ${match[1]} lá»‡nh vá»›i PnL rĂ²ng ${match[2]} vĂ  tá»· lá»‡ tháº¯ng ${match[3]}%.';
   }
 
   match = RegExp(
     r'^Average R is ([^ ]+) and profit factor is ([^ ]+)\.$',
   ).firstMatch(value);
   if (match != null) {
-    return 'R trung bình là ${match[1]} và hệ số lợi nhuận là ${match[2]}.';
+    return 'R trung bĂ¬nh lĂ  ${match[1]} vĂ  há»‡ sá»‘ lá»£i nhuáº­n lĂ  ${match[2]}.';
   }
 
   match = RegExp(
     r'^(.+) is the weakest symbol in this period at (.+)\.$',
   ).firstMatch(value);
   if (match != null) {
-    return '${match[1]} là mã yếu nhất trong kỳ này với ${match[2]}.';
+    return '${match[1]} lĂ  mĂ£ yáº¿u nháº¥t trong ká»³ nĂ y vá»›i ${match[2]}.';
   }
 
   match = RegExp(r'^(.+) is the strongest symbol at (.+)\.$').firstMatch(value);
   if (match != null) {
-    return '${match[1]} là mã mạnh nhất với ${match[2]}.';
+    return '${match[1]} lĂ  mĂ£ máº¡nh nháº¥t vá»›i ${match[2]}.';
   }
 
   match = RegExp(
     r'^Reduce or pause (.+) until the next review',
   ).firstMatch(value);
   if (match != null) {
-    return 'Giảm hoặc tạm dừng ${match[1]} cho đến lần review tiếp theo, trừ khi có setup A+ đã được viết rõ.';
+    return 'Giáº£m hoáº·c táº¡m dá»«ng ${match[1]} cho Ä‘áº¿n láº§n review tiáº¿p theo, trá»« khi cĂ³ setup A+ Ä‘Ă£ Ä‘Æ°á»£c viáº¿t rĂµ.';
   }
 
   match = RegExp(
     r'^Review (.+) session entries; this session contributed (.+)\.$',
   ).firstMatch(value);
   if (match != null) {
-    return 'Review các điểm vào lệnh phiên ${match[1]}; phiên này đóng góp ${match[2]}.';
+    return 'Review cĂ¡c Ä‘iá»ƒm vĂ o lá»‡nh phiĂªn ${match[1]}; phiĂªn nĂ y Ä‘Ă³ng gĂ³p ${match[2]}.';
   }
 
   match = RegExp(
     r'^Most repeated journal mistake: (.+) \((\d+)x\)\.$',
   ).firstMatch(value);
   if (match != null) {
-    return 'Lỗi journal lặp lại nhiều nhất: ${match[1]} (${match[2]} lần).';
+    return 'Lá»—i journal láº·p láº¡i nhiá»u nháº¥t: ${match[1]} (${match[2]} láº§n).';
   }
 
   match = RegExp(
     r"^Before the next trade, explicitly check: am I repeating '(.+)'\?$",
   ).firstMatch(value);
   if (match != null) {
-    return 'Trước lệnh tiếp theo, hãy kiểm tra rõ: mình có đang lặp lại "${match[1]}" không?';
+    return 'TrÆ°á»›c lá»‡nh tiáº¿p theo, hĂ£y kiá»ƒm tra rĂµ: mĂ¬nh cĂ³ Ä‘ang láº·p láº¡i "${match[1]}" khĂ´ng?';
   }
 
   match = RegExp(
     r'^(\d+) rule break types were detected in this period\.$',
   ).firstMatch(value);
   if (match != null) {
-    return 'Phát hiện ${match[1]} loại vi phạm rule trong kỳ này.';
+    return 'PhĂ¡t hiá»‡n ${match[1]} loáº¡i vi pháº¡m rule trong ká»³ nĂ y.';
   }
 
   match = RegExp(
     r'^Replay the worst trade \((.+) (.+)\) before taking another similar setup\.$',
   ).firstMatch(value);
   if (match != null) {
-    return 'Xem lại lệnh tệ nhất (${match[1]} ${match[2]}) trước khi vào setup tương tự.';
+    return 'Xem láº¡i lá»‡nh tá»‡ nháº¥t (${match[1]} ${match[2]}) trÆ°á»›c khi vĂ o setup tÆ°Æ¡ng tá»±.';
   }
 
   return value;
 }
+

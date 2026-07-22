@@ -155,7 +155,52 @@ def test_demo_harness_does_not_claim_broker_speed_without_measured_close_confirm
         )
 
 
+def test_demo_harness_uses_first_block_file_write_for_same_block_key() -> None:
+    with tempfile.TemporaryDirectory() as tmp:
+        data_dir = Path(tmp)
+        layer = EACommunicationLayer(data_dir=data_dir)
+        now = datetime.now(timezone.utc)
+        _write_jsonl(
+            data_dir / "backend_mt5_demo_audit.jsonl",
+            [
+                {
+                    "source": "backend",
+                    "event_type": "rule_detected",
+                    "account_id": 7,
+                    "occurred_at": now.isoformat(),
+                    "metadata": {"block_key": "b1"},
+                },
+                {
+                    "source": "backend",
+                    "event_type": "block_persisted",
+                    "account_id": 7,
+                    "occurred_at": (now + timedelta(milliseconds=40)).isoformat(),
+                    "metadata": {"block_key": "b1"},
+                },
+                {
+                    "source": "backend",
+                    "event_type": "block_file_written",
+                    "account_id": 7,
+                    "occurred_at": (now + timedelta(milliseconds=120)).isoformat(),
+                    "metadata": {"block_key": "b1"},
+                },
+                {
+                    "source": "backend",
+                    "event_type": "block_file_written",
+                    "account_id": 7,
+                    "occurred_at": (now + timedelta(seconds=150)).isoformat(),
+                    "metadata": {"block_key": "b1"},
+                },
+            ],
+        )
+
+        report = Mt5DemoHarnessService(layer).report(account_id=7)
+
+        assert report["timing_audit"]["durations_ms"]["backend_reaction_ms"] == 120
+
+
 if __name__ == "__main__":
     test_demo_harness_report_contains_required_checklist_and_timing_fields()
     test_demo_harness_does_not_claim_broker_speed_without_measured_close_confirmation()
+    test_demo_harness_uses_first_block_file_write_for_same_block_key()
     print("test_mt5_demo_harness_smoke: PASS")

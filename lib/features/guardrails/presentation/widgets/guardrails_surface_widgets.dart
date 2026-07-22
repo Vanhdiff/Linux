@@ -52,7 +52,7 @@ class GuardrailsOutlineAction extends StatelessWidget {
     return GestureDetector(
       onTap: onTap,
       child: Container(
-        height: 36,
+        height: 38,
         padding: const EdgeInsets.symmetric(horizontal: 14),
         alignment: Alignment.center,
         decoration: BoxDecoration(
@@ -90,7 +90,7 @@ class GuardrailsPrimaryAction extends StatelessWidget {
     return GestureDetector(
       onTap: onTap,
       child: Container(
-        height: 38,
+        height: 40,
         padding: const EdgeInsets.symmetric(horizontal: 18),
         alignment: Alignment.center,
         decoration: BoxDecoration(
@@ -127,8 +127,8 @@ class GuardrailsIconAction extends StatelessWidget {
     return GestureDetector(
       onTap: onTap,
       child: Container(
-        width: 36,
-        height: 36,
+        width: 40,
+        height: 40,
         alignment: Alignment.center,
         decoration: BoxDecoration(
           color: AppColors.surface,
@@ -158,7 +158,7 @@ class GuardrailsSettingRow extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      padding: const EdgeInsets.symmetric(vertical: 9),
+      padding: const EdgeInsets.symmetric(vertical: 12),
       decoration: BoxDecoration(
         border: Border(
           bottom: BorderSide(color: AppColors.border.withValues(alpha: 0.75)),
@@ -170,8 +170,8 @@ class GuardrailsSettingRow extends StatelessWidget {
           final titleBlock = Row(
             children: [
               Container(
-                width: 34,
-                height: 32,
+                width: 36,
+                height: 36,
                 alignment: Alignment.center,
                 decoration: BoxDecoration(
                   color: AppColors.primarySoft,
@@ -188,7 +188,7 @@ class GuardrailsSettingRow extends StatelessWidget {
                       title,
                       style: TextStyle(
                         color: AppColors.textPrimary,
-                        fontSize: 11,
+                        fontSize: 12,
                         fontWeight: FontWeight.w800,
                       ),
                     ),
@@ -197,7 +197,7 @@ class GuardrailsSettingRow extends StatelessWidget {
                       description,
                       style: TextStyle(
                         color: AppColors.textSecondary,
-                        fontSize: 9,
+                        fontSize: 10,
                         fontWeight: FontWeight.w500,
                       ),
                     ),
